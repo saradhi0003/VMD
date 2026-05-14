@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#1d5c37" />
+    <meta name="description" content="Vayumukhi Dairy — Owner Farm App. Track milk, animals, sales, costs, and AI alerts." />
+    <title>Vayumukhi — Owner Workspace</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="app-page">
+
+    <!-- ═══════════════════════════════════════════════════════
+         LOGIN GATE
+    ════════════════════════════════════════════════════════ -->
+    <div class="app-login-screen" id="loginScreen">
+      <div class="app-login-box">
+        <div class="alb-brand">
+          <span class="alb-mark">VD</span>
+          <div>
+            <strong>Vayumukhi Dairy</strong>
+            <small>Owner Workspace</small>
+          </div>
+        </div>
+        <h2>Sign in</h2>
+        <p class="alb-sub">Admin access only. Farm data is private.</p>
+        <form id="loginForm" class="login-form">
+          <label class="field">
+            Phone or email
+            <input id="adminUser" type="text" value="admin@vayumukhi.in" autocomplete="username" inputmode="email" />
+          </label>
+          <label class="field">
+            Password
+            <input id="adminPass" type="password" value="farm123" autocomplete="current-password" />
+          </label>
+          <button class="btn-primary btn-full" type="submit">Sign In to Farm</button>
+        </form>
+        <p class="form-note">Demo: any non-empty credentials will sign in.</p>
+        <a href="index.html" class="alb-back">Back to Vayumukhi website</a>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════
+         FULL-PAGE APP SHELL
+    ════════════════════════════════════════════════════════ -->
+    <div id="appShell" class="full-app hidden">
+
+      <!-- SIDEBAR (desktop) -->
+      <aside class="full-sidebar">
+        <div class="sidebar-brand">
+          <span class="sb-logo">VD</span>
+          <div>
+            <strong>Vayumukhi</strong>
+            <small>Owner App</small>
+          </div>
+        </div>
+
+        <p class="sidebar-section-label">Workspace</p>
+        <button class="sidebar-btn active" data-tab="workspace" type="button">
+          <span class="sb-icon ws-icon">W</span>Owner Workspace
+        </button>
+        <button class="sidebar-btn" data-tab="home" type="button">
+          <span class="sb-icon">H</span>Today
+        </button>
+
+        <p class="sidebar-section-label">Farm</p>
+        <button class="sidebar-btn" data-tab="milk" type="button">
+          <span class="sb-icon">M</span>Milk
+        </button>
+        <button class="sidebar-btn" data-tab="animals" type="button">
+          <span class="sb-icon">A</span>Animals
+        </button>
+        <button class="sidebar-btn" data-tab="sales" type="button">
+          <span class="sb-icon">S</span>Sales
+        </button>
+        <button class="sidebar-btn" data-tab="costs" type="button">
+          <span class="sb-icon">C</span>Costs
+        </button>
+
+        <p class="sidebar-section-label">AI</p>
+        <button class="sidebar-btn" data-tab="monitor" type="button">
+          <span class="sb-icon">!</span>Alerts
+        </button>
+        <button class="sidebar-btn" data-tab="assistant" type="button">
+          <span class="sb-icon">AI</span>Assistant
+        </button>
+
+        <div class="sidebar-status-card">
+          <span>Farm status</span>
+          <strong id="sidebarStatus">Checking...</strong>
+        </div>
+        <button class="sidebar-logout" id="logoutButton" type="button">Sign out</button>
+      </aside>
+
+      <!-- MAIN BODY -->
+      <div class="full-body">
+
+        <!-- TOP BAR -->
+        <header class="full-topbar">
+          <div class="full-topbar-left">
+            <h3 id="appTitle">Owner Workspace</h3>
+            <span id="appDate" class="app-date-label"></span>
+          </div>
+          <div class="full-topbar-right">
+            <button class="notif-btn" id="notificationButton" type="button" aria-label="Notifications">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+              </svg>
+              <span class="notif-badge hidden" id="notificationCount">0</span>
+            </button>
+            <div class="owner-avatar">AD</div>
+          </div>
+        </header>
+
+        <!-- NOTIFICATION DRAWER (WhatsApp-style) -->
+        <div class="notif-drawer hidden" id="notificationDrawer" role="region" aria-label="Farm notifications" aria-live="polite">
+          <div class="notif-drawer-header">
+            <div>
+              <h4>Farm Alerts</h4>
+              <span>WhatsApp-style notifications</span>
+            </div>
+            <button type="button" id="closeNotifBtn" class="notif-close-btn">Close</button>
+          </div>
+          <div id="notificationList" class="notif-list"></div>
+        </div>
+
+        <!-- TAB CONTENT -->
+        <main class="full-main">
+
+          <!-- ══════════════════════════════════════════════
+               OWNER WORKSPACE TAB (default landing)
+          ══════════════════════════════════════════════ -->
+          <div class="tab-panel active" id="tab-workspace">
+
+            <!-- Workspace header bar -->
+            <div class="ws-topbar">
+              <div class="ws-topbar-title">
+                <h2>Owner Workspace</h2>
+                <p>One desk for your farm, every single day.</p>
+              </div>
+              <div class="ws-stats-row">
+                <div class="ws-stat">
+                  <span>Pending</span>
+                  <strong id="wsPending">—</strong>
+                </div>
+                <div class="ws-stat">
+                  <span>Entries today</span>
+                  <strong id="wsEntries">—</strong>
+                </div>
+                <div class="ws-stat ws-stat-ok">
+                  <span>Last run</span>
+                  <strong id="wsLastRun">—</strong>
+                </div>
+                <div class="ws-stat">
+                  <span>Animals</span>
+                  <strong id="wsAnimals">34</strong>
+                </div>
+                <div class="ws-stat ws-stat-memory">
+                  <span>Patterns</span>
+                  <strong id="wsPatterns">4</strong>
+                </div>
+                <div class="ws-stat ws-stat-armed" id="wsFarmStatusCard">
+                  <span>Farm</span>
+                  <strong id="wsFarmStatus">ACTIVE</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- Three-column workspace grid -->
+            <div class="ws-grid">
+
+              <!-- ── Column 1: Action Queue ── -->
+              <div class="ws-panel">
+                <div class="ws-panel-head">
+                  <h4>Action Queue</h4>
+                  <span class="ws-badge" id="wsQueueBadge">0 pending</span>
+                </div>
+                <div id="wsActionQueue" class="ws-queue-list"></div>
+              </div>
+
+              <!-- ── Column 2: Farm Memory + Pipeline ── -->
+              <div class="ws-panel">
+                <div class="ws-panel-head">
+                  <h4>Farm Memory</h4>
+                  <span>AI reflections</span>
+                </div>
+                <div id="wsMemory" class="ws-memory-list"></div>
+
+                <div class="ws-divider"></div>
+
+                <div class="ws-panel-head">
+                  <h4>Pipeline Trace</h4>
+                  <span id="wsRunTime">—</span>
+                </div>
+                <div id="wsPipeline" class="ws-pipeline-list"></div>
+              </div>
+
+              <!-- ── Column 3: Decision Detail ── -->
+              <div class="ws-panel ws-detail-panel">
+                <div class="ws-panel-head">
+                  <h4>Decision Detail</h4>
+                  <span id="wsDetailStatus" class="ws-detail-label">Select an action</span>
+                </div>
+                <div id="wsDetail" class="ws-detail-body">
+                  <div class="ws-detail-empty">
+                    <span>Click any action in the queue to see details and take action.</span>
+                  </div>
+                </div>
+                <div class="ws-detail-actions hidden" id="wsDetailActions">
+                  <button class="btn-primary btn-sm" id="wsApproveBtn" type="button">Approve</button>
+                  <button class="btn-secondary btn-sm" id="wsDismissBtn" type="button">Dismiss</button>
+                  <button class="ws-view-btn btn-sm" id="wsViewBtn" type="button">View records</button>
+                </div>
+                <div class="ws-citations hidden" id="wsCitations">
+                  <p class="ws-cite-label">CITATIONS</p>
+                  <div id="wsCitationList"></div>
+                </div>
+              </div>
+
+            </div><!-- /.ws-grid -->
+
+            <!-- Run history footer -->
+            <div class="ws-run-history">
+              <div class="ws-panel-head">
+                <h4>Run History</h4>
+                <span>Last 5 AI checks</span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>Time</th><th>Type</th><th>Status</th><th>Checks run</th><th>Alerts</th><th>Fallback</th></tr>
+                  </thead>
+                  <tbody id="wsRunHistory"></tbody>
+                </table>
+              </div>
+            </div>
+
+          </div><!-- /#tab-workspace -->
+
+          <!-- ─── HOME / DAILY DASHBOARD ─── -->
+          <div class="tab-panel" id="tab-home">
+            <div class="summary-card" id="summaryCard">
+              <span class="card-eyebrow">AI Farm Check</span>
+              <h4 id="summaryTitle">Checking farm status...</h4>
+              <p id="summaryBody"></p>
+              <div class="summary-actions">
+                <button class="btn-primary btn-sm" data-go="milk" type="button">Add Milk</button>
+                <button class="btn-secondary btn-sm" id="focusMonitorButton" type="button">Run Check</button>
+              </div>
+            </div>
+            <div class="kpi-row">
+              <div class="kpi-card"><span class="kpi-label">Milk today</span><strong class="kpi-value" id="kpiMilk">—</strong></div>
+              <div class="kpi-card"><span class="kpi-label">Sales</span><strong class="kpi-value" id="kpiSales">—</strong></div>
+              <div class="kpi-card"><span class="kpi-label">Costs</span><strong class="kpi-value" id="kpiExpenses">—</strong></div>
+              <div class="kpi-card kpi-highlight"><span class="kpi-label">Net today</span><strong class="kpi-value" id="kpiNet">—</strong></div>
+            </div>
+            <h4 class="section-label">Quick Actions</h4>
+            <div class="action-grid">
+              <button class="action-card" data-go="milk" type="button">
+                <div class="action-icon" style="background:#e8f5ed;color:#1d5c37">M</div>
+                <strong>Add Milk</strong><span>Morning or evening</span>
+              </button>
+              <button class="action-card" data-go="sales" type="button">
+                <div class="action-icon" style="background:#fff8e1;color:#b8740a">S</div>
+                <strong>Add Sale</strong><span>Customer purchase</span>
+              </button>
+              <button class="action-card" data-go="costs" type="button">
+                <div class="action-icon" style="background:#fce4ec;color:#c62828">C</div>
+                <strong>Add Cost</strong><span>Salary or expense</span>
+              </button>
+              <button class="action-card" data-go="assistant" type="button">
+                <div class="action-icon" style="background:#ede7f6;color:#4527a0">AI</div>
+                <strong>Speak Entry</strong><span>Voice or type</span>
+              </button>
+            </div>
+            <h4 class="section-label">Upcoming Reminders</h4>
+            <div id="dashboardReminders" class="reminder-strip"></div>
+            <details class="chart-details">
+              <summary>Show milk trend &amp; customer mix</summary>
+              <div class="charts-row">
+                <div class="chart-card">
+                  <div class="chart-head"><strong>7-day milk</strong><span>Litres</span></div>
+                  <div class="bar-chart" id="milkChart"></div>
+                </div>
+                <div class="chart-card">
+                  <div class="chart-head"><strong>Customer sales</strong><span>Today</span></div>
+                  <div id="customerList" class="customer-list"></div>
+                </div>
+              </div>
+            </details>
+            <h4 class="section-label">AI Insights</h4>
+            <div id="dashboardInsights" class="insights-strip"></div>
+          </div>
+
+          <!-- ─── MILK ─── -->
+          <div class="tab-panel" id="tab-milk">
+            <div class="tab-header">
+              <h3>Milk Production</h3><span class="tab-sub">Daily entry</span>
+            </div>
+            <form class="entry-form" id="productionForm">
+              <label class="field">Date<input type="date" id="productionDate" /></label>
+              <div class="field-row">
+                <label class="field">Morning (L)<input type="number" id="morningMilk" min="0" value="118" inputmode="numeric" /></label>
+                <label class="field">Evening (L)<input type="number" id="eveningMilk" min="0" value="102" inputmode="numeric" /></label>
+              </div>
+              <label class="field">Fat %<input type="number" id="fatPercent" min="0" step="0.1" value="4.3" inputmode="decimal" /></label>
+              <button class="btn-primary btn-full" type="submit">Save Milk Entry</button>
+            </form>
+            <div class="upload-card">
+              <h4>Upload Paper Sheet</h4>
+              <p>Take a photo of the handwritten milk record — the app reads the numbers automatically.</p>
+              <label class="upload-zone">
+                <input type="file" id="sheetUpload" accept="image/*" capture="environment" />
+                <span class="upload-camera-icon">C</span>
+                <strong>Take photo or upload</strong>
+                <span>Handwritten paper sheet</span>
+              </label>
+              <div id="ocrResult" class="ocr-result hidden"></div>
+            </div>
+            <details class="records-accordion">
+              <summary>Recent milk entries</summary>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Date</th><th>Morning</th><th>Evening</th><th>Total</th><th>Fat</th></tr></thead>
+                  <tbody id="productionTable"></tbody>
+                </table>
+              </div>
+            </details>
+          </div>
+
+          <!-- ─── ANIMALS ─── -->
+          <div class="tab-panel" id="tab-animals">
+            <div class="tab-header">
+              <h3>Animals</h3>
+              <button class="btn-secondary btn-sm" id="addAnimalButton" type="button">+ Add Animal</button>
+            </div>
+            <div class="animal-grid" id="animalGrid"></div>
+          </div>
+
+          <!-- ─── SALES ─── -->
+          <div class="tab-panel" id="tab-sales">
+            <div class="tab-header">
+              <h3>Sales</h3><span class="tab-sub">Customer purchases</span>
+            </div>
+            <form class="entry-form" id="salesForm">
+              <label class="field">Customer name<input id="customerName" type="text" value="Lakshmi Stores" /></label>
+              <label class="field">Product<select id="salesProduct"><option>Milk</option><option>Curd</option><option>Paneer</option><option>Ghee</option></select></label>
+              <div class="field-row">
+                <label class="field">Quantity<input id="salesQty" type="number" min="1" value="24" inputmode="numeric" /></label>
+                <label class="field">Amount (₹)<input id="salesAmount" type="number" min="0" value="1440" inputmode="numeric" /></label>
+              </div>
+              <button class="btn-primary btn-full" type="submit">Save Sale</button>
+            </form>
+            <div class="forecast-strip">
+              <span>Next month forecast</span>
+              <strong id="forecastValue">—</strong>
+            </div>
+            <details class="records-accordion">
+              <summary>Recent sales</summary>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Customer</th><th>Product</th><th>Qty</th><th>Amount</th></tr></thead>
+                  <tbody id="salesTable"></tbody>
+                </table>
+              </div>
+            </details>
+          </div>
+
+          <!-- ─── COSTS ─── -->
+          <div class="tab-panel" id="tab-costs">
+            <div class="tab-header">
+              <h3>Costs &amp; Expenses</h3><span class="tab-sub">Daily spending</span>
+            </div>
+            <form class="entry-form" id="expenseForm">
+              <label class="field">Category<select id="expenseCategory"><option>Salaries</option><option>Medication</option><option>Feed</option><option>Misc</option></select></label>
+              <label class="field">Description<input id="expenseDescription" type="text" value="Veterinary checkup" /></label>
+              <label class="field">Amount (₹)<input id="expenseAmount" type="number" min="0" value="1800" inputmode="numeric" /></label>
+              <button class="btn-primary btn-full" type="submit">Save Cost</button>
+            </form>
+            <div class="expense-split-card">
+              <div class="chart-head"><strong>Cost breakdown</strong><span>Week</span></div>
+              <div id="expenseRings" class="expense-bars"></div>
+            </div>
+            <details class="records-accordion">
+              <summary>Recent costs</summary>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Category</th><th>Description</th><th>Amount</th></tr></thead>
+                  <tbody id="expenseTable"></tbody>
+                </table>
+              </div>
+            </details>
+          </div>
+
+          <!-- ─── MONITOR / ALERTS ─── -->
+          <div class="tab-panel" id="tab-monitor">
+            <div class="tab-header">
+              <h3>Farm Alerts</h3>
+              <button class="btn-primary btn-sm" id="monitorNowButton" type="button">Run Check</button>
+            </div>
+            <div class="agent-hero">
+              <span class="card-eyebrow">AI Agent</span>
+              <h4>Daily farm monitor</h4>
+              <p>Checks milk entries, sales, costs, vet visits, and fodder cycles every day. Sends WhatsApp-style alerts when something needs attention.</p>
+            </div>
+            <h4 class="section-label">Today's checklist</h4>
+            <div id="agentChecks" class="checks-list"></div>
+            <h4 class="section-label">Upcoming reminders</h4>
+            <div id="reminderList" class="reminders-list"></div>
+            <h4 class="section-label">AI insights</h4>
+            <div id="insightList" class="insights-list"></div>
+          </div>
+
+          <!-- ─── ASSISTANT ─── -->
+          <div class="tab-panel" id="tab-assistant">
+            <div class="tab-header">
+              <h3>AI Assistant</h3><span class="tab-sub">Voice or type</span>
+            </div>
+            <div class="assistant-tip">
+              Try: <em>"Morning milk 120 litres, evening 95 litres, fat 4.2"</em><br>
+              or: <em>"Salary cost five thousand rupees"</em>
+            </div>
+            <div class="assistant-body">
+              <button class="voice-btn" id="voiceButton" type="button">
+                <span class="voice-icon">M</span>Speak
+              </button>
+              <textarea id="assistantInput" rows="4" placeholder="Type here or press Speak...">Today morning milk 120 litres evening 96 litres fat 4.2</textarea>
+              <button class="btn-primary btn-full" id="parseButton" type="button">Save from text</button>
+            </div>
+            <div id="assistantOutput" class="assistant-output hidden" aria-live="polite"></div>
+          </div>
+
+        </main><!-- /.full-main -->
+
+        <!-- MOBILE BOTTOM NAV -->
+        <nav class="bottom-nav" aria-label="App navigation">
+          <button class="bnav-btn active" data-tab="workspace" type="button">
+            <span class="bnav-icon" style="font-size:9px;font-weight:900">WS</span>
+            <span>Workspace</span>
+          </button>
+          <button class="bnav-btn" data-tab="home" type="button">
+            <span class="bnav-icon">H</span>
+            <span>Today</span>
+          </button>
+          <button class="bnav-btn" data-tab="milk" type="button">
+            <span class="bnav-icon">M</span>
+            <span>Milk</span>
+          </button>
+          <button class="bnav-btn" data-tab="sales" type="button">
+            <span class="bnav-icon">S</span>
+            <span>Sales</span>
+          </button>
+          <button class="bnav-btn" data-tab="monitor" type="button">
+            <span class="bnav-icon bnav-alert-icon" id="alertNavIcon">!</span>
+            <span>Alerts</span>
+          </button>
+        </nav>
+
+      </div><!-- /.full-body -->
+    </div><!-- /#appShell -->
+
+    <script src="app.js"></script>
+  </body>
+</html>

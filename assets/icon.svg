@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Vayumukhi Dairy icon">
+  <rect width="512" height="512" fill="#12382d"/>
+  <path d="M82 344c54-86 105-134 174-134s120 48 174 134H82Z" fill="#7ea94d"/>
+  <path d="M119 329c40-56 82-84 137-84s97 28 137 84H119Z" fill="#fbfaf6"/>
+  <path d="M163 313c30-32 59-48 93-48s63 16 93 48H163Z" fill="#d99b2b"/>
+  <path d="M168 177h176v108H168z" fill="#fbfaf6"/>
+  <path d="M187 199h42v42h-42zm96 0h42v42h-42z" fill="#12382d"/>
+  <path d="M160 177l96-78 96 78H160Z" fill="#9e4b34"/>
+  <path d="M248 286h16v58h-16z" fill="#12382d"/>
+  <text x="256" y="422" text-anchor="middle" font-family="Arial, sans-serif" font-size="70" font-weight="900" fill="#fbfaf6">VD</text>
+</svg>

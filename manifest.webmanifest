@@ -1,0 +1,39 @@
+{
+  "name": "Vayumukhi Dairy — Owner Workspace",
+  "short_name": "VMD Farm",
+  "description": "Daily farm tracker with AI agent monitoring, WhatsApp-style alerts, and owner workspace for Vayumukhi Dairy.",
+  "start_url": "./app.html",
+  "id": "./app.html",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "background_color": "#efeae2",
+  "theme_color": "#1d5c37",
+  "orientation": "portrait-primary",
+  "scope": "./",
+  "categories": ["business", "productivity"],
+  "lang": "en-IN",
+  "icons": [
+    {
+      "src": "assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Add Milk",
+      "short_name": "Milk",
+      "description": "Quick milk production entry",
+      "url": "./app.html#milk",
+      "icons": [{ "src": "assets/icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Farm Alerts",
+      "short_name": "Alerts",
+      "description": "Check today's AI alerts",
+      "url": "./app.html#monitor",
+      "icons": [{ "src": "assets/icon.svg", "sizes": "any" }]
+    }
+  ]
+}
