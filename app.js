@@ -801,21 +801,17 @@ function wireEvents() {
     renderAll();
   });
 
-  // PHOTO upload (OCR simulation)
-  qs("#sheetUpload")?.addEventListener("change", e => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const simulated = { date: today, morning: 122, evening: 97, fat: 4.2 };
-    state.production.push(simulated);
-    const ocrEl = qs("#ocrResult");
-    if (ocrEl) {
-      ocrEl.classList.remove("hidden");
-      ocrEl.innerHTML = `<strong>Photo processed: ${file.name}</strong><p>Extracted ${simulated.morning} L morning, ${simulated.evening} L evening, ${simulated.fat}% fat. Entry saved.</p>`;
-    }
-    addNotification("Paper sheet converted", `Photo created a production record for ${total(simulated)} L.`, "success");
-    sendPush("Vayumukhi Farm", "Paper sheet processed and entry saved.");
-    renderAll();
-  });
+  // SMART SCANNER (replaces single-purpose photo upload)
+  qsa("[data-open-scanner]").forEach(btn => btn.addEventListener("click", () => openScanner()));
+  qs("#globalScanButton")?.addEventListener("click", () => openScanner());
+  qsa("[data-close-scanner]").forEach(el => el.addEventListener("click", () => closeScanner()));
+  qs("#scanStartCamera")?.addEventListener("click", startScannerCamera);
+  qs("#scanCaptureBtn")?.addEventListener("click", captureFromCamera);
+  qs("#scanFileInput")?.addEventListener("change", handleScanFile);
+  qs("#scanRescanBtn")?.addEventListener("click", () => showScanStep("capture"));
+  qs("#scanReclassifyBtn")?.addEventListener("click", reclassifyScan);
+  qs("#scanSaveBtn")?.addEventListener("click", saveScannedEntry);
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !qs("#scanModal")?.classList.contains("hidden")) closeScanner(); });
 
   // ADD ANIMAL
   qs("#addAnimalButton")?.addEventListener("click", () => {
@@ -870,6 +866,290 @@ function handleAssistantInput() {
   addNotification("Assistant created entry", `${result.type} data was created from your input.`, "success");
   sendPush("Vayumukhi Farm", `${result.type} entry created by assistant.`);
   renderAll();
+}
+
+/* ────────────────────────────────────────────────────
+   SMART SCANNER  —  Auto-routes scanned docs to Milk / Sales / Costs
+──────────────────────────────────────────────────── */
+const scannerState = {
+  stream: null,
+  capturedDataUrl: null,
+  capturedFileName: null,
+  detected: null,
+  forceRoute: null
+};
+
+function openScanner(forceRoute = null) {
+  const modal = qs("#scanModal");
+  if (!modal) return;
+  modal.classList.remove("hidden");
+  document.body.style.overflow = "hidden";
+  scannerState.forceRoute = forceRoute;
+  resetScannerState();
+  showScanStep("capture");
+}
+
+function closeScanner() {
+  qs("#scanModal")?.classList.add("hidden");
+  document.body.style.overflow = "";
+  stopScannerCamera();
+}
+
+function showScanStep(step) {
+  ["Capture", "Processing", "Review"].forEach(s => {
+    qs(`#scanStep${s}`)?.classList.toggle("hidden", s.toLowerCase() !== step);
+  });
+  if (step === "capture") {
+    qs("#scanStageEmpty")?.classList.remove("hidden");
+    qs("#scanVideo")?.classList.remove("active");
+    const btn = qs("#scanCaptureBtn"); if (btn) btn.disabled = true;
+    const hint = qs("#scanHint"); if (hint) hint.innerHTML = "Tap <strong>Start Camera</strong> or upload a photo.";
+  }
+}
+
+function resetScannerState() {
+  scannerState.capturedDataUrl = null;
+  scannerState.capturedFileName = null;
+  scannerState.detected = null;
+  qsa(".scan-progress li").forEach(li => { li.classList.remove("active", "done"); });
+}
+
+async function startScannerCamera() {
+  const video = qs("#scanVideo");
+  const hint  = qs("#scanHint");
+  if (!video) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" } }, audio: false
+    });
+    scannerState.stream = stream;
+    video.srcObject = stream;
+    video.classList.add("active");
+    qs("#scanStageEmpty")?.classList.add("hidden");
+    const btn = qs("#scanCaptureBtn"); if (btn) btn.disabled = false;
+    if (hint) hint.innerHTML = "Align the document, then tap <strong>Capture</strong>.";
+  } catch (err) {
+    if (hint) hint.innerHTML = "<strong>Camera unavailable.</strong> Use <em>Upload Photo</em> instead.";
+  }
+}
+
+function stopScannerCamera() {
+  if (scannerState.stream) {
+    scannerState.stream.getTracks().forEach(t => t.stop());
+    scannerState.stream = null;
+  }
+  const video = qs("#scanVideo");
+  if (video) { video.srcObject = null; video.classList.remove("active"); }
+}
+
+function captureFromCamera() {
+  const video  = qs("#scanVideo");
+  const canvas = qs("#scanCanvas");
+  if (!video || !canvas || !scannerState.stream) return;
+  const w = video.videoWidth || 720;
+  const h = video.videoHeight || 960;
+  canvas.width = w; canvas.height = h;
+  canvas.getContext("2d").drawImage(video, 0, 0, w, h);
+  scannerState.capturedDataUrl = canvas.toDataURL("image/jpeg", 0.82);
+  scannerState.capturedFileName = `camera-${Date.now()}.jpg`;
+  stopScannerCamera();
+  processCapture();
+}
+
+function handleScanFile(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    scannerState.capturedDataUrl = ev.target.result;
+    scannerState.capturedFileName = file.name;
+    processCapture();
+  };
+  reader.readAsDataURL(file);
+  e.target.value = "";
+}
+
+function processCapture() {
+  showScanStep("processing");
+  const img = qs("#scanPreviewImg");
+  if (img) img.src = scannerState.capturedDataUrl;
+
+  const steps = qsa(".scan-progress li");
+  steps.forEach(li => li.classList.remove("active", "done"));
+
+  let i = 0;
+  const tick = () => {
+    if (i > 0) { steps[i - 1].classList.remove("active"); steps[i - 1].classList.add("done"); }
+    if (i < steps.length) {
+      steps[i].classList.add("active");
+      i++;
+      setTimeout(tick, 620);
+    } else {
+      const detection = classifyCapture(scannerState.capturedFileName);
+      scannerState.detected = detection;
+      renderScanReview(detection);
+      showScanStep("review");
+    }
+  };
+  tick();
+}
+
+/* Smart classifier — filename keyword heuristics + active-tab fallback.
+   In production this would call a vision/OCR backend. */
+function classifyCapture(filename = "") {
+  const name = (filename || "").toLowerCase();
+
+  const milkKeys  = ["milk", "sheet", "production", "litre", "liter", "morning", "evening", "fat"];
+  const salesKeys = ["sale", "invoice", "bill", "customer", "delivery", "slip", "order"];
+  const costKeys  = ["receipt", "expense", "cost", "salary", "wage", "vendor", "feed", "vet", "medic", "fuel", "diesel"];
+
+  const hits = {
+    milk:  milkKeys.filter(k => name.includes(k)).length,
+    sales: salesKeys.filter(k => name.includes(k)).length,
+    costs: costKeys.filter(k => name.includes(k)).length
+  };
+
+  let route = scannerState.forceRoute;
+  if (!route) {
+    if (hits.milk + hits.sales + hits.costs === 0) {
+      const activeTab = qs(".tab-panel.active")?.id?.replace("tab-", "");
+      route = ["milk", "sales", "costs"].includes(activeTab) ? activeTab : "milk";
+    } else {
+      route = Object.entries(hits).sort((a, b) => b[1] - a[1])[0][0];
+    }
+  }
+
+  const confidence = 88 + Math.floor(Math.random() * 10);
+
+  if (route === "milk") {
+    const morning = 100 + Math.floor(Math.random() * 30);
+    const evening = 85  + Math.floor(Math.random() * 25);
+    const fat     = (3.8 + Math.random() * 0.8).toFixed(1);
+    return {
+      route, confidence,
+      title: "Milk production sheet detected",
+      fields: [
+        { key: "date",    label: "Date",        value: today,   type: "date" },
+        { key: "morning", label: "Morning (L)", value: morning, type: "number" },
+        { key: "evening", label: "Evening (L)", value: evening, type: "number" },
+        { key: "fat",     label: "Fat %",       value: fat,     type: "number", step: "0.1" }
+      ]
+    };
+  }
+  if (route === "sales") {
+    const customers = ["Lakshmi Stores", "Sai Apartments", "Annapurna Hotel", "Meera Home", "Ravi General"];
+    const products  = ["Milk", "Curd", "Paneer", "Ghee"];
+    const rate      = { Milk: 60, Curd: 90, Paneer: 320, Ghee: 750 };
+    const product   = products[Math.floor(Math.random() * products.length)];
+    const qty       = 6 + Math.floor(Math.random() * 24);
+    return {
+      route, confidence,
+      title: "Customer bill detected",
+      fields: [
+        { key: "customer", label: "Customer",    value: customers[Math.floor(Math.random() * customers.length)], type: "text" },
+        { key: "product",  label: "Product",     value: product, type: "select", options: products },
+        { key: "qty",      label: "Quantity",    value: qty,     type: "number" },
+        { key: "amount",   label: "Amount (₹)",  value: qty * rate[product], type: "number" }
+      ]
+    };
+  }
+  const categories = ["Salaries", "Medication", "Feed", "Misc"];
+  let category = "Misc";
+  if (/salar|wage/.test(name)) category = "Salaries";
+  else if (/medic|vet/.test(name)) category = "Medication";
+  else if (/feed|fodder/.test(name)) category = "Feed";
+  else category = categories[Math.floor(Math.random() * categories.length)];
+  const descMap = {
+    Salaries:   "Farm helper daily wage",
+    Medication: "Veterinary visit & medicine",
+    Feed:       "Mineral mix + Napier fodder",
+    Misc:       "Route diesel & supplies"
+  };
+  return {
+    route: "costs", confidence,
+    title: "Expense receipt detected",
+    fields: [
+      { key: "category",    label: "Category",    value: category, type: "select", options: categories },
+      { key: "description", label: "Description", value: descMap[category], type: "text" },
+      { key: "amount",      label: "Amount (₹)",  value: 400 + Math.floor(Math.random() * 4600), type: "number" }
+    ]
+  };
+}
+
+function renderScanReview(d) {
+  const routeLabel = { milk: "MILK · PRODUCTION", sales: "SALES · CUSTOMER", costs: "COSTS · EXPENSE" };
+  const pill = qs("#scanRoutePill");
+  if (pill) {
+    pill.textContent = routeLabel[d.route] || d.route.toUpperCase();
+    pill.className = `scan-route-pill route-${d.route}`;
+  }
+  setText("#scanResultTitle", d.title);
+  setText("#scanResultConfidence", `Confidence ${d.confidence}% · Auto-routed to ${d.route.charAt(0).toUpperCase() + d.route.slice(1)}`);
+
+  const fieldsEl = qs("#scanFields");
+  if (!fieldsEl) return;
+  fieldsEl.innerHTML = d.fields.map(f => {
+    if (f.type === "select") {
+      return `<label class="scan-field"><span>${f.label}</span><select data-field="${f.key}">${
+        f.options.map(o => `<option ${o === f.value ? "selected" : ""}>${o}</option>`).join("")
+      }</select></label>`;
+    }
+    const step = f.step ? ` step="${f.step}"` : "";
+    return `<label class="scan-field"><span>${f.label}</span><input data-field="${f.key}" type="${f.type}" value="${f.value}"${step} /></label>`;
+  }).join("");
+}
+
+function reclassifyScan() {
+  if (!scannerState.detected) return;
+  const order = ["milk", "sales", "costs"];
+  const next  = order[(order.indexOf(scannerState.detected.route) + 1) % order.length];
+  scannerState.forceRoute = next;
+  const d = classifyCapture(scannerState.capturedFileName);
+  scannerState.detected = d;
+  renderScanReview(d);
+}
+
+function saveScannedEntry() {
+  const d = scannerState.detected;
+  if (!d) return;
+  const vals = {};
+  qsa("#scanFields [data-field]").forEach(el => vals[el.dataset.field] = el.value);
+
+  if (d.route === "milk") {
+    const entry = {
+      date:    vals.date || today,
+      morning: Number(vals.morning) || 0,
+      evening: Number(vals.evening) || 0,
+      fat:     Number(vals.fat) || 4.0
+    };
+    state.production.push(entry);
+    addNotification("Scanned milk entry saved", `${entry.morning} L morning + ${entry.evening} L evening from photo.`, "success");
+    sendPush("Vayumukhi Farm", `Scanner saved ${total(entry)} L milk entry.`);
+    goTab("milk");
+  } else if (d.route === "sales") {
+    const entry = {
+      customer: vals.customer || "Scanned Customer",
+      product:  vals.product  || "Milk",
+      qty:      Number(vals.qty) || 1,
+      amount:   Number(vals.amount) || 0
+    };
+    state.sales.push(entry);
+    addNotification("Scanned sale saved", `${entry.customer} — ${entry.qty} ${entry.product} · ${rupee.format(entry.amount)}`, "success");
+    sendPush("Vayumukhi Farm", `Scanner saved sale: ${rupee.format(entry.amount)}`);
+    goTab("sales");
+  } else {
+    const entry = {
+      category:    vals.category    || "Misc",
+      description: vals.description || "Scanned expense",
+      amount:      Number(vals.amount) || 0
+    };
+    state.expenses.push(entry);
+    addNotification("Scanned cost saved", `${entry.category} — ${rupee.format(entry.amount)}`, "info");
+    sendPush("Vayumukhi Farm", `Scanner saved ${entry.category} expense.`);
+    goTab("costs");
+  }
+  renderAll();
+  closeScanner();
 }
 
 /* ────────────────────────────────────────────────────

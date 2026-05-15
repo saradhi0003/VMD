@@ -25,7 +25,10 @@
         <a href="#products">Products</a>
         <a href="#why-us">Why Us</a>
       </nav>
-      <a class="nav-cta" href="app.html" target="_blank" rel="noopener">Farm App</a>
+      <div class="nav-ctas">
+        <a class="nav-cta nav-cta--ghost" href="worker.html" target="_blank" rel="noopener">Worker</a>
+        <a class="nav-cta" href="app.html" target="_blank" rel="noopener">Owner</a>
+      </div>
       <button class="nav-hamburger" id="navHamburger" type="button" aria-label="Open menu">
         <span></span><span></span><span></span>
       </button>
@@ -36,7 +39,8 @@
       <a href="#story">Our Story</a>
       <a href="#products">Products</a>
       <a href="#why-us">Why Us</a>
-      <a href="app.html" target="_blank" rel="noopener" class="mobile-nav-cta">Open Farm App</a>
+      <a href="worker.html" target="_blank" rel="noopener" class="mobile-nav-cta mobile-nav-cta--ghost">Open Worker App</a>
+      <a href="app.html" target="_blank" rel="noopener" class="mobile-nav-cta">Open Owner App</a>
     </div>
 
     <main id="home">
@@ -52,7 +56,8 @@
           <div class="hero-btns">
             <a class="btn-primary" href="#products">See our products</a>
             <a class="btn-ghost" href="#why-us">Why we are different</a>
-            <a class="btn-primary" href="app.html" target="_blank" rel="noopener" style="background:var(--marigold);color:#1a1e1a">Open Farm App</a>
+            <a class="btn-primary" href="worker.html" target="_blank" rel="noopener" style="background:var(--marigold);color:#1a1e1a">Open Worker App</a>
+            <a class="btn-primary" href="app.html" target="_blank" rel="noopener">Open Owner App</a>
           </div>
         </div>
       </section>
@@ -96,27 +101,49 @@
         <div class="section-head">
           <span class="chip chip-yellow">Products</span>
           <h2>From our farm<br>to your home.</h2>
+          <p class="section-sub">Three things, done properly. Milk drawn the same morning. Curd set overnight. Ghee slow-cooked the old way. Each batch carries a date, a fat percentage, and the name of the cow it came from.</p>
         </div>
         <div class="products-grid">
           <article class="product-card">
-            <div class="product-icon-wrap" style="background:#e8f5ed"><span class="product-initial">M</span></div>
-            <h3>Fresh Milk</h3>
-            <p>Morning and evening collection tracked by batch, fat percentage, route, and customer.</p>
+            <div class="product-photo"><img src="assets/product-milk.jpg" alt="Fresh whole milk in a glass jug" loading="lazy"></div>
+            <div class="product-body">
+              <span class="product-tag">Daily · 5:30 AM &amp; 5:30 PM</span>
+              <h3>Fresh Whole Milk</h3>
+              <p>Unhomogenised, lightly pasteurised cow milk. Collected twice a day, logged by batch, fat %, route, and customer — bottled the same hour it leaves the cow.</p>
+              <ul class="product-meta">
+                <li><strong>Fat</strong> 4.0 – 4.5%</li>
+                <li><strong>SNF</strong> 8.5%+</li>
+                <li><strong>Pack</strong> 500 ml &amp; 1 L glass</li>
+              </ul>
+            </div>
           </article>
+
           <article class="product-card">
-            <div class="product-icon-wrap" style="background:#fff8e1"><span class="product-initial">C</span></div>
-            <h3>Curd</h3>
-            <p>Thick, probiotic-rich curd set daily from fresh whole milk for households and stores.</p>
+            <div class="product-photo"><img src="assets/product-curd.jpg" alt="Thick homemade dahi in a bowl" loading="lazy"></div>
+            <div class="product-body">
+              <span class="product-tag">Set fresh · Daily</span>
+              <h3>Thick Curd (Dahi)</h3>
+              <p>Set overnight from full-cream milk with a heritage culture passed down three generations. Probiotic, scoop-able, and never sour.</p>
+              <ul class="product-meta">
+                <li><strong>Fat</strong> 4%+</li>
+                <li><strong>Shelf</strong> 4 days chilled</li>
+                <li><strong>Pack</strong> 200 g &amp; 400 g</li>
+              </ul>
+            </div>
           </article>
+
           <article class="product-card">
-            <div class="product-icon-wrap" style="background:#fce4ec"><span class="product-initial">P</span></div>
-            <h3>Paneer</h3>
-            <p>Soft, fresh-pressed paneer for restaurants, subscriptions, and household daily orders.</p>
-          </article>
-          <article class="product-card">
-            <div class="product-icon-wrap" style="background:#ede7f6"><span class="product-initial">G</span></div>
-            <h3>Ghee</h3>
-            <p>Slow-cultured, clarified ghee from our own cream — rich, golden, and farm-traceable.</p>
+            <div class="product-photo"><img src="assets/product-ghee.jpg" alt="Golden pure ghee in a glass jar" loading="lazy"></div>
+            <div class="product-body">
+              <span class="product-tag">Bilona · Wood-fired</span>
+              <h3>Cultured Ghee</h3>
+              <p>Cream is cultured for 12 hours, churned into makhan, then slow-cooked over a low flame until it turns deep amber. Grainy, fragrant, never burnt.</p>
+              <ul class="product-meta">
+                <li><strong>From</strong> A2-cream</li>
+                <li><strong>Shelf</strong> 9 months</li>
+                <li><strong>Pack</strong> 250 ml &amp; 500 ml glass</li>
+              </ul>
+            </div>
           </article>
         </div>
       </section>
@@ -124,25 +151,136 @@
       <!-- ── WHY US ── -->
       <section class="why-section" id="why-us">
         <div class="why-inner">
-          <div class="why-copy">
-            <span class="chip chip-white">Why we are different</span>
-            <h2>We don't just say<br>it's fresh. We show it.</h2>
-            <p>Most dairy brands make promises. Vayumukhi Dairy is built around a daily record system that proves every claim — from how much milk was collected this morning to the health status of every animal.</p>
-            <ul class="check-list">
-              <li>Name and health record for every animal</li>
-              <li>Daily milk production logged morning and evening</li>
-              <li>Voice and photo entry for farm workers</li>
-              <li>AI agent that monitors missing entries and alerts the owner</li>
-              <li>Vet visits, fodder cycles, and medication reminders</li>
-              <li>Customer purchase history and sales forecasting</li>
-            </ul>
-            <a class="btn-primary" href="app.html" target="_blank" rel="noopener">Open Owner Workspace</a>
+          <div class="why-intro">
+            <span class="chip chip-white">Why us</span>
+            <h2>A small farm,<br>run by a small family.</h2>
+            <p class="why-lead">I'm not going to pretend we're a brand. We're a family. My grandfather started this shed with two cows and a brass pot. My father ran it for forty years on memory and notebooks. I came back home from the city to take it forward — with the same cows, the same hands, and a phone in my pocket that finally helps us keep track.</p>
+            <p class="why-lead">This page isn't a marketing pitch. It's just how we work, written down honestly so you can decide if you want our milk in your kitchen.</p>
+            <div class="why-metrics">
+              <div class="metric-card"><span>Years in the family</span><strong>3 gens</strong></div>
+              <div class="metric-card"><span>Animals we know by name</span><strong>28</strong></div>
+              <div class="metric-card"><span>Homes we deliver to</span><strong>180+</strong></div>
+              <div class="metric-card"><span>Hours from cow to door</span><strong>&lt; 3</strong></div>
+            </div>
           </div>
-          <div class="why-metrics">
-            <div class="metric-card"><span>Monthly revenue forecast</span><strong id="publicRevenue">₹4.8L</strong></div>
-            <div class="metric-card"><span>Production utilization</span><strong>91%</strong></div>
-            <div class="metric-card"><span>Repeat customers</span><strong>68%</strong></div>
-            <div class="metric-card"><span>On-time deliveries</span><strong>99%</strong></div>
+
+          <div class="why-story">
+            <article class="story-block story-block--reverse">
+              <div class="story-text">
+                <span class="story-step">01</span>
+                <h3>Our cows have names. We use them.</h3>
+                <p>Lakshmi is the calm one. Ganga kicks if you milk her on the wrong side. Saraswati waits at the gate every morning because she knows my mother is coming with a piece of jaggery. We don’t put numbers on their ears. We grew up with their grandmothers.</p>
+                <p>That changes how a farm runs. If a cow is off her feed, we notice the same morning. If her milk drops by half a litre, we catch it in the next session. No animal here is on growth hormones, no animal is pushed past what she’s comfortable giving. They eat well, sleep on dry beds, get bathed twice a day, and the calves stay with their mothers far longer than the textbooks say.</p>
+                <ul class="story-points">
+                  <li>Every animal has a name, a birthday, and a health card</li>
+                  <li>No growth hormones, no rBST, no forced lactation</li>
+                  <li>Calves nurse first — we milk what’s left</li>
+                </ul>
+              </div>
+              <div class="story-art story-art--accent">
+                <div class="story-stat"><strong>28</strong><span>cows we know by name</span></div>
+                <div class="story-stat"><strong>0</strong><span>hormones, ever — ask any of our 180+ regulars</span></div>
+                <div class="story-stat"><strong>2×</strong><span>daily wash &amp; health check, by hand</span></div>
+              </div>
+            </article>
+
+            <article class="story-block">
+              <div class="story-art story-art--photo">
+                <img src="assets/whyus-fodder.jpg" alt="Farmer hand-feeding fresh green fodder to a cow" loading="lazy">
+                <span class="story-caption">That’s my uncle Ravi, feeding Kamala her morning Napier grass.</span>
+              </div>
+              <div class="story-text">
+                <span class="story-step">02</span>
+                <h3>We grow most of what they eat</h3>
+                <p>Two of the four acres behind the shed are fodder. Napier grass through most of the year, hybrid maize in summer, jowar and a few seasonal legumes when the rains come. We cut it fresh every morning — you can smell it from the road. There’s no commercial cattle feed in those bales, no chemical fertiliser on that field. We add the mineral mix ourselves, by hand, measured for each cow depending on whether she’s in early lactation, peak, or dry.</p>
+                <p>This is the part most dairies don’t want you to look at. We do, because what an animal eats is what you eat one step removed.</p>
+                <ul class="story-points">
+                  <li>Two acres of own-grown Napier, maize, jowar, and legumes</li>
+                  <li>Zero chemical fertilisers on our fodder fields</li>
+                  <li>Per-cow mineral mix — measured by hand, not by sack</li>
+                </ul>
+              </div>
+            </article>
+
+            <article class="story-block story-block--reverse">
+              <div class="story-text">
+                <span class="story-step">03</span>
+                <h3>Every litre, twice a day, written down</h3>
+                <p>My father did this in a black notebook for forty years. Same handwriting, same column headings. I just put a phone next to the notebook so the numbers don’t live and die in one drawer. At 5:30 AM and 5:30 PM, we milk, we weigh, we test the fat — and the page gets photographed into the app right there at the shed.</p>
+                <p>If the morning numbers look off, I see it on my phone before the route van leaves. If a cow drops in fat percentage three days in a row, the app nudges me to call the vet. The notebook still lives in the drawer. Now it has a memory.</p>
+                <ul class="story-points">
+                  <li>Twice-daily weighing, with the milker’s name on every entry</li>
+                  <li>Fat % tested on every batch, every session</li>
+                  <li>Paper sheets are the source of truth — the phone is just the copy</li>
+                </ul>
+              </div>
+              <div class="story-art story-art--ledger">
+                <div class="ledger-row"><span>05:38 AM</span><strong>Lakshmi</strong><em>7.2 L · 4.3%</em></div>
+                <div class="ledger-row"><span>05:42 AM</span><strong>Ganga</strong><em>6.8 L · 4.1%</em></div>
+                <div class="ledger-row"><span>05:47 AM</span><strong>Saraswati</strong><em>8.1 L · 4.5%</em></div>
+                <div class="ledger-row"><span>05:51 AM</span><strong>Yamuna</strong><em>7.6 L · 4.2%</em></div>
+                <div class="ledger-row ledger-row--total"><span>Morning batch</span><strong>187.4 L</strong><em>4.3% avg</em></div>
+              </div>
+            </article>
+
+            <article class="story-block">
+              <div class="story-art story-art--cards">
+                <div class="mini-card"><strong>Quarterly</strong><span>full vet check-up</span></div>
+                <div class="mini-card"><strong>Monthly</strong><span>parasite &amp; deworming</span></div>
+                <div class="mini-card"><strong>Weekly</strong><span>hoof &amp; udder inspection</span></div>
+                <div class="mini-card"><strong>Daily</strong><span>temperature &amp; appetite log</span></div>
+              </div>
+              <div class="story-text">
+                <span class="story-step">04</span>
+                <h3>The vet comes before the medicine</h3>
+                <p>Dr. Subbu has been our vet for sixteen years. He knows our herd better than most doctors know their patients. He comes every quarter for a full check, every month for parasite control, and any time something feels off in between. We don’t wait for a problem to call him.</p>
+                <p>When an animal does get sick, her milk is pulled out of supply for the full withdrawal period. Not shortened. Not blended. We log the medicine, the dose, and the date she comes back into the tank. I’d rather lose a week of one cow’s milk than send something to your child’s glass that I wouldn’t give my own.</p>
+              </div>
+            </article>
+
+            <article class="story-block story-block--reverse">
+              <div class="story-text">
+                <span class="story-step">05</span>
+                <h3>The shed is old. The phone is new.</h3>
+                <p>The people running this farm have done it their whole lives. I’m not about to replace them with software. What I did build is a quiet little app that watches in the background — it checks if anyone forgot to log a cow this morning, if a customer hasn’t reordered in a while, if our costs this month are creeping up. Then it sends me a WhatsApp, the way a friend would.</p>
+                <p>That’s all the “tech” is. No middlemen, no AI farmer, no buzzwords. Just a way to make sure nothing falls through the cracks when there are 28 animals and 180 homes to think about.</p>
+                <ul class="story-points">
+                  <li>Voice and photo entry for the workers — no typing needed</li>
+                  <li>A small AI agent that flags missing entries and quiet customers</li>
+                  <li>WhatsApp alerts to me, not a dashboard nobody reads</li>
+                </ul>
+              </div>
+              <div class="story-art story-art--chat">
+                <div class="chat-bubble chat-bubble--bot"><strong>Agent</strong><span>Morning entry for Lakshmi is missing.</span><time>06:12 AM</time></div>
+                <div class="chat-bubble chat-bubble--user"><span>On it — Ravi is finishing her batch now.</span><time>06:13 AM</time></div>
+                <div class="chat-bubble chat-bubble--bot"><strong>Agent</strong><span>Anitha aunty hasn’t ordered in 12 days. Send her a small ghee jar?</span><time>06:14 AM</time></div>
+              </div>
+            </article>
+
+            <article class="story-block">
+              <div class="story-art story-art--timeline">
+                <div class="tl-step"><strong>5:30 AM</strong><span>Milking</span></div>
+                <div class="tl-arrow">→</div>
+                <div class="tl-step"><strong>6:30 AM</strong><span>Bottling &amp; QC</span></div>
+                <div class="tl-arrow">→</div>
+                <div class="tl-step"><strong>7:00 AM</strong><span>Routes leave</span></div>
+                <div class="tl-arrow">→</div>
+                <div class="tl-step"><strong>8:30 AM</strong><span>At your door</span></div>
+              </div>
+              <div class="story-text">
+                <span class="story-step">06</span>
+                <h3>From our cow to your kitchen — same morning</h3>
+                <p>There’s no collection agent in the middle. No cold storage warehouse. No “regional processing plant.” The same hands that milk the cow at 5:30 load the bottles into the van by 7. By the time your kettle is on, your bottle is on your doorstep — still cold from the shed, with today’s date and the batch number on the cap.</p>
+                <p>If anything is ever wrong with a bottle, you call one number. My number. You get me, or my father, or my uncle. Not a call centre, not a chatbot. That’s the whole point of staying small.</p>
+              </div>
+            </article>
+
+            <div class="why-pledge">
+              <h3>Our promise</h3>
+              <p>If we can’t trace it back to the cow, the day, and the hands that drew it — it doesn’t leave our farm. That’s the only promise we make. Everything else, you can see for yourself.</p>
+              <p class="why-signoff">— The Vayumukhi family</p>
+              <a class="btn-primary" href="app.html" target="_blank" rel="noopener">See today’s ledger</a>
+            </div>
           </div>
         </div>
       </section>
@@ -150,10 +288,23 @@
       <!-- ── FARM APP CTA ── -->
       <section class="farm-app-wrap" id="farm-app">
         <div class="farm-app-intro">
-          <span class="chip chip-green">Admin only — opens in a new tab</span>
-          <h2>Owner Workspace</h2>
-          <p>One desk for your farm, every day. Track milk, animals, sales, costs, and get AI-powered alerts — all from your phone.</p>
-          <a class="btn-primary" href="app.html" target="_blank" rel="noopener" style="margin:0 auto;max-width:300px;display:flex;justify-content:center">Open Owner Workspace</a>
+          <span class="chip chip-green">Sign-in required — opens in a new tab</span>
+          <h2>Two workspaces, one farm</h2>
+          <p>The owner sees everything — sales, costs, animals, reminders, AI alerts. The worker sees only what they need to get the day done.</p>
+          <div class="farm-app-cards">
+            <a class="farm-app-card farm-app-card--owner" href="app.html" target="_blank" rel="noopener">
+              <span class="farm-app-badge">For the owner</span>
+              <h3>Owner Workspace</h3>
+              <p>Full dashboard: milk, animals, sales, costs, customers, reminders, and the AI farm check that runs every morning.</p>
+              <span class="farm-app-cta">Open Owner Workspace →</span>
+            </a>
+            <a class="farm-app-card farm-app-card--worker" href="worker.html" target="_blank" rel="noopener">
+              <span class="farm-app-badge farm-app-badge--worker">For the worker</span>
+              <h3>Worker Workspace</h3>
+              <p>Simple, phone-first. Big buttons for Log Milk, Feed, Health, Wash, Scan, and Speak — plus today's reminders.</p>
+              <span class="farm-app-cta">Open Worker Workspace →</span>
+            </a>
+          </div>
         </div>
       </section>
 

@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#1d5c37" />
+    <meta name="description" content="Vayumukhi Dairy — Worker Workspace. Log your shift, see your tasks and reminders." />
+    <title>Vayumukhi — Worker Workspace</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="app-page worker-page">
+
+    <!-- ═══════════════════════════════════════════════════════
+         LOGIN GATE
+    ════════════════════════════════════════════════════════ -->
+    <div class="app-login-screen" id="loginScreen">
+      <div class="app-login-box">
+        <div class="alb-brand">
+          <span class="alb-mark">VD</span>
+          <div>
+            <strong>Vayumukhi Dairy</strong>
+            <small>Worker Workspace</small>
+          </div>
+        </div>
+        <h2>Sign in</h2>
+        <p class="alb-sub">For farm workers — log your shift and see what's next.</p>
+        <form id="loginForm" class="login-form">
+          <label class="field">
+            Your name
+            <select id="workerName" autocomplete="username">
+              <option value="Ravi">Ravi (uncle)</option>
+              <option value="Suresh">Suresh</option>
+              <option value="Lakshmi Akka">Lakshmi Akka</option>
+              <option value="Murthy">Murthy</option>
+            </select>
+          </label>
+          <label class="field">
+            PIN
+            <input id="workerPin" type="password" value="1234" inputmode="numeric" maxlength="4" autocomplete="current-password" />
+          </label>
+          <button class="btn-primary btn-full" type="submit">Start My Shift</button>
+        </form>
+        <p class="form-note">Demo: any 4-digit PIN will sign in.</p>
+        <a href="index.html" class="alb-back">Back to Vayumukhi website</a>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════
+         WORKER APP SHELL
+    ════════════════════════════════════════════════════════ -->
+    <div id="workerShell" class="worker-shell hidden">
+
+      <!-- Top bar -->
+      <header class="worker-topbar">
+        <div class="worker-brand">
+          <span class="worker-logo">VD</span>
+          <div>
+            <strong>Vayumukhi</strong>
+            <small>Worker app</small>
+          </div>
+        </div>
+        <div class="worker-user">
+          <div class="worker-user-meta">
+            <strong id="workerWelcomeName">—</strong>
+            <span id="workerGreeting">Good morning</span>
+          </div>
+          <span class="worker-avatar" id="workerAvatar">R</span>
+          <button class="worker-signout" id="workerSignOut" type="button" title="Sign out">Sign out</button>
+        </div>
+      </header>
+
+      <main class="worker-main">
+
+        <!-- Today summary strip -->
+        <section class="worker-hello">
+          <div>
+            <h2 id="workerHelloTitle">Hello, Ravi</h2>
+            <p id="workerHelloSub">Thursday, 14 May · Shift begins 5:30 AM</p>
+          </div>
+          <div class="worker-shift-pill" id="workerShiftPill">
+            <span class="shift-dot"></span>
+            <span id="workerShiftLabel">Morning shift</span>
+          </div>
+        </section>
+
+        <!-- Quick Actions -->
+        <section class="worker-section">
+          <div class="worker-section-head">
+            <h3>Quick Actions</h3>
+            <span class="worker-section-sub">Tap any one to log it</span>
+          </div>
+          <div class="worker-actions">
+            <button class="worker-action" data-action="milk" type="button">
+              <span class="wa-icon wa-green">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2h8l-1 4v3l3 7v6a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-6l3-7V6z"/><path d="M9 2h6"/></svg>
+              </span>
+              <strong>Log Milk</strong>
+              <span class="wa-sub">Morning &amp; evening litres</span>
+            </button>
+
+            <button class="worker-action" data-action="feed" type="button">
+              <span class="wa-icon wa-leaf">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 4 13c0-6 9-9 16-9 0 7-3 16-9 16Z"/><path d="M4 20l8-8"/></svg>
+              </span>
+              <strong>Feed &amp; Fodder</strong>
+              <span class="wa-sub">Mark today's feeding done</span>
+            </button>
+
+            <button class="worker-action" data-action="health" type="button">
+              <span class="wa-icon wa-red">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+              </span>
+              <strong>Health Note</strong>
+              <span class="wa-sub">Any animal looking off?</span>
+            </button>
+
+            <button class="worker-action" data-action="clean" type="button">
+              <span class="wa-icon wa-blue">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12c2-4 16-4 18 0"/><path d="M3 12c2 4 16 4 18 0"/><path d="M12 6v12"/></svg>
+              </span>
+              <strong>Shed Wash</strong>
+              <span class="wa-sub">Morning or evening clean</span>
+            </button>
+
+            <button class="worker-action" data-action="scan" type="button">
+              <span class="wa-icon wa-amber">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              </span>
+              <strong>Scan Paper</strong>
+              <span class="wa-sub">Photograph the day's sheet</span>
+            </button>
+
+            <button class="worker-action worker-action--voice" data-action="voice" type="button">
+              <span class="wa-icon wa-purple">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+              </span>
+              <strong>Speak Entry</strong>
+              <span class="wa-sub">Talk instead of typing</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- My Activities Today -->
+        <section class="worker-section">
+          <div class="worker-section-head">
+            <h3>My Activities Today</h3>
+            <span class="worker-section-sub" id="workerActivityCount">0 logged</span>
+          </div>
+          <ul class="worker-activity-list" id="workerActivityList">
+            <!-- rendered -->
+          </ul>
+          <p class="worker-empty" id="workerActivityEmpty">No activities yet today. Tap any Quick Action above to log your first one.</p>
+        </section>
+
+        <!-- Reminders -->
+        <section class="worker-section">
+          <div class="worker-section-head">
+            <h3>Reminders</h3>
+            <span class="worker-section-sub">From the owner &amp; the vet</span>
+          </div>
+          <ul class="worker-reminder-list" id="workerReminderList">
+            <!-- rendered -->
+          </ul>
+        </section>
+
+      </main>
+
+      <!-- ═══════════════════════════════════════════════════════
+           ACTION MODAL — shared for all Quick Actions
+      ════════════════════════════════════════════════════════ -->
+      <div class="worker-modal" id="workerModal" hidden>
+        <div class="worker-modal-backdrop" data-close-modal></div>
+        <div class="worker-modal-card" role="dialog" aria-modal="true">
+          <header class="worker-modal-head">
+            <h3 id="workerModalTitle">Log entry</h3>
+            <button class="worker-modal-close" data-close-modal type="button" aria-label="Close">×</button>
+          </header>
+          <div class="worker-modal-body" id="workerModalBody"></div>
+          <footer class="worker-modal-foot">
+            <button class="btn-secondary" data-close-modal type="button">Cancel</button>
+            <button class="btn-primary" id="workerModalSave" type="button">Save</button>
+          </footer>
+        </div>
+      </div>
+
+      <!-- Toast -->
+      <div class="worker-toast" id="workerToast" hidden></div>
+
+    </div>
+
+    <script src="worker.js"></script>
+  </body>
+</html>

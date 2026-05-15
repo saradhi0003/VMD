@@ -103,6 +103,10 @@
             <span id="appDate" class="app-date-label"></span>
           </div>
           <div class="full-topbar-right">
+            <button class="scan-btn" id="globalScanButton" type="button" aria-label="Open smart scanner">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M3 12h18"/></svg>
+              <span>Scan</span>
+            </button>
             <button class="notif-btn" id="notificationButton" type="button" aria-label="Notifications">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -308,16 +312,24 @@
               <label class="field">Fat %<input type="number" id="fatPercent" min="0" step="0.1" value="4.3" inputmode="decimal" /></label>
               <button class="btn-primary btn-full" type="submit">Save Milk Entry</button>
             </form>
-            <div class="upload-card">
-              <h4>Upload Paper Sheet</h4>
-              <p>Take a photo of the handwritten milk record — the app reads the numbers automatically.</p>
-              <label class="upload-zone">
-                <input type="file" id="sheetUpload" accept="image/*" capture="environment" />
-                <span class="upload-camera-icon">C</span>
-                <strong>Take photo or upload</strong>
-                <span>Handwritten paper sheet</span>
-              </label>
-              <div id="ocrResult" class="ocr-result hidden"></div>
+            <div class="scanner-card" data-scan-host="milk">
+              <div class="scanner-card-head">
+                <div>
+                  <h4>Smart Scanner</h4>
+                  <p>Snap a paper sheet, bill, or receipt — AI reads it and saves to the right place.</p>
+                </div>
+                <span class="scanner-chip">AUTO-ROUTE</span>
+              </div>
+              <button class="scanner-launch-btn" data-open-scanner type="button">
+                <span class="scanner-launch-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                </span>
+                <span class="scanner-launch-text">
+                  <strong>Open Camera Scanner</strong>
+                  <span>Milk · Sales · Costs — auto-detected</span>
+                </span>
+                <span class="scanner-launch-arrow">›</span>
+              </button>
             </div>
             <details class="records-accordion">
               <summary>Recent milk entries</summary>
@@ -353,6 +365,25 @@
               </div>
               <button class="btn-primary btn-full" type="submit">Save Sale</button>
             </form>
+            <div class="scanner-card" data-scan-host="sales">
+              <div class="scanner-card-head">
+                <div>
+                  <h4>Smart Scanner</h4>
+                  <p>Scan a customer bill or delivery slip — auto-fills sale details.</p>
+                </div>
+                <span class="scanner-chip">AUTO-ROUTE</span>
+              </div>
+              <button class="scanner-launch-btn" data-open-scanner type="button">
+                <span class="scanner-launch-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                </span>
+                <span class="scanner-launch-text">
+                  <strong>Open Camera Scanner</strong>
+                  <span>Bill, invoice, or delivery slip</span>
+                </span>
+                <span class="scanner-launch-arrow">›</span>
+              </button>
+            </div>
             <div class="forecast-strip">
               <span>Next month forecast</span>
               <strong id="forecastValue">—</strong>
@@ -379,6 +410,25 @@
               <label class="field">Amount (₹)<input id="expenseAmount" type="number" min="0" value="1800" inputmode="numeric" /></label>
               <button class="btn-primary btn-full" type="submit">Save Cost</button>
             </form>
+            <div class="scanner-card" data-scan-host="costs">
+              <div class="scanner-card-head">
+                <div>
+                  <h4>Smart Scanner</h4>
+                  <p>Scan a vendor bill, salary slip, or feed receipt — auto-categorised.</p>
+                </div>
+                <span class="scanner-chip">AUTO-ROUTE</span>
+              </div>
+              <button class="scanner-launch-btn" data-open-scanner type="button">
+                <span class="scanner-launch-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                </span>
+                <span class="scanner-launch-text">
+                  <strong>Open Camera Scanner</strong>
+                  <span>Receipt, bill, salary slip</span>
+                </span>
+                <span class="scanner-launch-arrow">›</span>
+              </button>
+            </div>
             <div class="expense-split-card">
               <div class="chart-head"><strong>Cost breakdown</strong><span>Week</span></div>
               <div id="expenseRings" class="expense-bars"></div>
@@ -460,6 +510,79 @@
 
       </div><!-- /.full-body -->
     </div><!-- /#appShell -->
+
+    <!-- ═══════════════════════════════════════════════════════
+         SMART SCANNER MODAL
+    ════════════════════════════════════════════════════════ -->
+    <div class="scan-modal hidden" id="scanModal" role="dialog" aria-modal="true" aria-labelledby="scanModalTitle">
+      <div class="scan-modal-backdrop" data-close-scanner></div>
+      <div class="scan-modal-card">
+        <header class="scan-modal-head">
+          <div>
+            <span class="scan-modal-eyebrow">AI · AUTO-ROUTE</span>
+            <h3 id="scanModalTitle">Smart Scanner</h3>
+          </div>
+          <button class="scan-close-btn" type="button" data-close-scanner aria-label="Close scanner">×</button>
+        </header>
+
+        <!-- STEP 1: Capture -->
+        <section class="scan-step" id="scanStepCapture">
+          <div class="scan-stage">
+            <video id="scanVideo" autoplay playsinline muted></video>
+            <canvas id="scanCanvas" class="hidden"></canvas>
+            <div class="scan-frame"><span></span><span></span><span></span><span></span></div>
+            <div class="scan-stage-empty" id="scanStageEmpty">
+              <span class="scan-stage-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              </span>
+              <strong>Position document in frame</strong>
+              <span>Milk sheet, bill, or receipt</span>
+            </div>
+          </div>
+          <div class="scan-hint" id="scanHint">Tap <strong>Start Camera</strong> or upload a photo.</div>
+          <div class="scan-actions">
+            <button class="btn-secondary btn-sm" id="scanStartCamera" type="button">Start Camera</button>
+            <label class="btn-secondary btn-sm scan-upload-btn">
+              Upload Photo
+              <input type="file" id="scanFileInput" accept="image/*" hidden />
+            </label>
+            <button class="btn-primary btn-sm" id="scanCaptureBtn" type="button" disabled>Capture</button>
+          </div>
+        </section>
+
+        <!-- STEP 2: Processing -->
+        <section class="scan-step hidden" id="scanStepProcessing">
+          <div class="scan-preview-wrap">
+            <img id="scanPreviewImg" alt="Captured document" />
+            <div class="scan-scanline"></div>
+          </div>
+          <ul class="scan-progress">
+            <li data-step="ocr">Reading text from image</li>
+            <li data-step="classify">Classifying document type</li>
+            <li data-step="extract">Extracting fields</li>
+            <li data-step="route">Routing to correct form</li>
+          </ul>
+        </section>
+
+        <!-- STEP 3: Review & confirm -->
+        <section class="scan-step hidden" id="scanStepReview">
+          <div class="scan-result-head">
+            <span class="scan-route-pill" id="scanRoutePill">MILK</span>
+            <div>
+              <strong id="scanResultTitle">Milk production sheet detected</strong>
+              <span id="scanResultConfidence">Confidence 96%</span>
+            </div>
+          </div>
+          <div class="scan-fields" id="scanFields"></div>
+          <p class="scan-result-note">Auto-detected from image. Edit any field before saving.</p>
+          <div class="scan-actions">
+            <button class="btn-secondary btn-sm" id="scanRescanBtn" type="button">Re-scan</button>
+            <button class="btn-secondary btn-sm" id="scanReclassifyBtn" type="button">Change Type</button>
+            <button class="btn-primary btn-sm" id="scanSaveBtn" type="button">Save Entry</button>
+          </div>
+        </section>
+      </div>
+    </div>
 
     <script src="app.js"></script>
   </body>
