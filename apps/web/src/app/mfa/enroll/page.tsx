@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@vmd/supabase";
 
@@ -13,7 +13,6 @@ export default function MfaEnrollPage() {
 }
 
 function MfaEnroll() {
-  const supabase = useMemo(() => createBrowserClient(), []);
   const router = useRouter();
   const next = useSearchParams().get("next") || "/";
 
@@ -27,6 +26,7 @@ function MfaEnroll() {
 
   useEffect(() => {
     (async () => {
+      const supabase = createBrowserClient();
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -65,6 +65,7 @@ function MfaEnroll() {
     if (!factorId) return;
     setBusy(true);
     setError(null);
+    const supabase = createBrowserClient();
     const { data: ch, error: chErr } = await supabase.auth.mfa.challenge({ factorId });
     if (chErr || !ch) {
       setError(chErr?.message ?? "Challenge failed.");
