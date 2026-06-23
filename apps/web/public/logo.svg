@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Vayumukhi Milk Center">
+  <circle cx="60" cy="60" r="58" fill="#173a5c"/>
+  <clipPath id="vmdClip"><circle cx="60" cy="60" r="51"/></clipPath>
+  <g clip-path="url(#vmdClip)">
+    <rect width="120" height="120" fill="#dcebfb"/>
+    <path d="M0,76 q30,-10 60,0 t60,0 V120 H0 Z" fill="#7cb463"/>
+    <path d="M0,84 q30,-8 60,0 t60,0 V120 H0 Z" fill="#5f9c49"/>
+    <!-- ears -->
+    <ellipse cx="35" cy="50" rx="10" ry="6.5" transform="rotate(-28 35 50)" fill="#ffffff" stroke="#173a5c" stroke-width="2.5"/>
+    <ellipse cx="85" cy="50" rx="10" ry="6.5" transform="rotate(28 85 50)" fill="#1b1b1b"/>
+    <!-- horns -->
+    <path d="M45,33 q-5,-11 2,-15 q5,9 1,16 Z" fill="#ecdba8" stroke="#173a5c" stroke-width="1.5"/>
+    <path d="M75,33 q5,-11 -2,-15 q-5,9 -1,16 Z" fill="#ecdba8" stroke="#173a5c" stroke-width="1.5"/>
+    <!-- face -->
+    <path d="M60,29 C39,29 32,46 32,61 C32,79 46,91 60,91 C74,91 88,79 88,61 C88,46 81,29 60,29 Z" fill="#ffffff" stroke="#173a5c" stroke-width="3"/>
+    <!-- black patches -->
+    <path d="M41,45 q9,-11 17,-4 q-1,11 -10,13 q-9,-2 -7,-9 Z" fill="#1b1b1b"/>
+    <path d="M79,45 q-9,-11 -17,-4 q1,11 10,13 q9,-2 7,-9 Z" fill="#1b1b1b"/>
+    <!-- eyes -->
+    <circle cx="49" cy="57" r="3.6" fill="#173a5c"/>
+    <circle cx="71" cy="57" r="3.6" fill="#173a5c"/>
+    <!-- muzzle -->
+    <ellipse cx="60" cy="75" rx="16" ry="11.5" fill="#f6c9ce" stroke="#173a5c" stroke-width="2.5"/>
+    <circle cx="53" cy="75" r="2.2" fill="#173a5c"/>
+    <circle cx="67" cy="75" r="2.2" fill="#173a5c"/>
+    <!-- milk drop -->
+    <path d="M104,40 c4,5 6,9 0,12 c-6,-3 -4,-7 0,-12 Z" fill="#ffffff" stroke="#3f93cf" stroke-width="1.5"/>
+  </g>
+</svg>

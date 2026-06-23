@@ -1,0 +1,48 @@
+{
+  "name": "@vmd/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test --project=e2e",
+    "test:e2e:ui": "playwright test --project=e2e --ui",
+    "test:perf": "playwright test --project=perf",
+    "seed:auth": "node scripts/seed-auth.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@hookform/resolvers": "^3.9.0",
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.45.4",
+    "@tanstack/react-query": "^5.59.0",
+    "@vmd/jobs": "workspace:*",
+    "@vmd/llm": "workspace:*",
+    "@vmd/supabase": "workspace:*",
+    "inngest": "^3.27.0",
+    "next": "^15.0.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-hook-form": "^7.53.0",
+    "recharts": "^3.8.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.0",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.20",
+    "dotenv": "^17.4.2",
+    "eslint": "^9.12.0",
+    "eslint-config-next": "^15.0.3",
+    "lighthouse": "^13.4.0",
+    "playwright-lighthouse": "^4.0.0",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13",
+    "typescript": "^5.6.2"
+  }
+}

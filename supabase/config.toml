@@ -1,0 +1,56 @@
+# Supabase project config — managed by the Supabase CLI.
+# https://supabase.com/docs/guides/cli/config
+
+project_id = "vayumukhi-dairy"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = [
+  "http://localhost:3000/api/auth/callback",
+  "http://localhost:3000/auth/accept-invite",
+]
+jwt_expiry = 3600
+# Public signup is blocked in-app (no signup page); accounts are created only by
+# owner invite/admin actions. enable_signup stays true so admin.inviteUserByEmail works.
+enable_signup = true
+enable_anonymous_sign_ins = false
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+
+# Multi-factor auth — TOTP authenticator apps (Google Authenticator / Authy / 1Password).
+# Required for every account; enforced in apps/web/src/middleware.ts via the AAL check.
+[auth.mfa]
+max_enrolled_factors = 5
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[auth.external.google]
+enabled = false
+client_id = "env(SUPABASE_AUTH_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_GOOGLE_SECRET)"
+redirect_uri = "http://localhost:54321/auth/v1/callback"

@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* surfaces */
+  --bg: #ffffff;
+  --surface: #f6f9fb;
+  --surface-alt: #eaf3fa;
+  --line: rgba(0, 0, 0, 0.08);
+
+  /* ink */
+  --ink: #14202b;
+  --ink-2: #5a6772;
+  --ink-3: #8a96a0;
+
+  /* brand */
+  --navy: #173a5c;
+  --navy-deep: #0d1820;
+  --blue: #3f93cf;
+
+  /* status */
+  --ok: #1f8a5b;
+  --warn: #c2722f;
+
+  /* shape */
+  --r-card: 18px;
+  --r-tile: 14px;
+  --r-pill: 999px;
+  --r-screen: 32px;
+  --r-bezel: 42px;
+
+  /* elevation — reserve shadow for FLOATING elements only */
+  --shadow-float: 0 1px 3px rgba(0, 0, 0, 0.08);
+
+  /* spacing rhythm */
+  --pad-card: 20px;
+  --section-y: 80px;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Mono eyebrow / label helper */
+.eyebrow {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* Striped placeholder for imagery slots (§11) */
+.ph-stripe {
+  background: repeating-linear-gradient(135deg, #eef3f6, #eef3f6 11px, #f6f9fb 11px, #f6f9fb 22px);
+  border: 1px solid var(--line);
+}
+
+/* Recharts: keep axis text on-palette */
+.recharts-cartesian-axis-tick text {
+  fill: var(--ink-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

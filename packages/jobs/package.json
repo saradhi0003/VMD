@@ -1,0 +1,25 @@
+{
+  "name": "@vmd/jobs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./functions": "./src/functions/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "@vmd/llm": "workspace:*",
+    "@vmd/supabase": "workspace:*",
+    "inngest": "^3.27.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.2"
+  }
+}

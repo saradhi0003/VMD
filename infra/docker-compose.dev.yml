@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vmd-postgres-dev
+    environment:
+      POSTGRES_USER: vmd
+      POSTGRES_PASSWORD: vmd
+      POSTGRES_DB: vmd
+    ports:
+      - "5433:5432"
+    volumes:
+      - vmd_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vmd -d vmd"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  inngest:
+    image: inngest/inngest:latest
+    container_name: vmd-inngest-dev
+    command: ["inngest", "dev", "-u", "http://host.docker.internal:3000/api/inngest"]
+    ports:
+      - "8288:8288"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  vmd_pg:
