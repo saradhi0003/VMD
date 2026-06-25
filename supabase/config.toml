@@ -22,6 +22,11 @@ port = 54323
 enabled = true
 file_size_limit = "50MiB"
 
+# Observability services (logflare + vector) aren't needed for tests and are a
+# common cause of unhealthy local starts — turn them off for a lean test stack.
+[analytics]
+enabled = false
+
 [auth]
 enabled = true
 site_url = "http://localhost:3000"
