@@ -33,10 +33,11 @@ const config: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "img-src 'self' data: blob: https://*.public.blob.vercel-storage.com",
+              "img-src 'self' data: blob: https://*.supabase.co https://*.public.blob.vercel-storage.com",
               "script-src 'self' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
-              "connect-src 'self' https://api.anthropic.com https://api.inngest.com",
+              // Supabase REST/Auth (https) + Realtime (wss) must be allowed for the browser client.
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.anthropic.com https://api.inngest.com",
               "frame-ancestors 'none'",
             ].join("; "),
           },

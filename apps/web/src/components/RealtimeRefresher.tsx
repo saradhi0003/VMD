@@ -18,6 +18,7 @@ export function RealtimeRefresher({ tables, farmId }: { tables: string[]; farmId
 
   useEffect(() => {
     const supabase = createBrowserClient();
+    if (!supabase) return; // env unavailable → skip realtime, never crash the page
     const channel = supabase.channel(`rt:${farmId}:${tables.join(",")}`);
 
     const scheduleRefresh = () => {

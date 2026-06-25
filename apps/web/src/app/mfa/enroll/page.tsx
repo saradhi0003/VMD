@@ -27,6 +27,11 @@ function MfaEnroll() {
   useEffect(() => {
     (async () => {
       const supabase = createBrowserClient();
+      if (!supabase) {
+        setError("Authentication is temporarily unavailable. Please try again.");
+        setLoading(false);
+        return;
+      }
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -66,6 +71,11 @@ function MfaEnroll() {
     setBusy(true);
     setError(null);
     const supabase = createBrowserClient();
+    if (!supabase) {
+      setError("Authentication is temporarily unavailable.");
+      setBusy(false);
+      return;
+    }
     const { data: ch, error: chErr } = await supabase.auth.mfa.challenge({ factorId });
     if (chErr || !ch) {
       setError(chErr?.message ?? "Challenge failed.");

@@ -25,6 +25,11 @@ function MfaChallenge() {
   useEffect(() => {
     (async () => {
       const supabase = createBrowserClient();
+      if (!supabase) {
+        setError("Authentication is temporarily unavailable. Please try again.");
+        setLoading(false);
+        return;
+      }
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -50,6 +55,11 @@ function MfaChallenge() {
     setBusy(true);
     setError(null);
     const supabase = createBrowserClient();
+    if (!supabase) {
+      setError("Authentication is temporarily unavailable.");
+      setBusy(false);
+      return;
+    }
     const { data: ch, error: chErr } = await supabase.auth.mfa.challenge({ factorId });
     if (chErr || !ch) {
       setError(chErr?.message ?? "Challenge failed.");
@@ -68,7 +78,7 @@ function MfaChallenge() {
 
   async function signOut() {
     const supabase = createBrowserClient();
-    await supabase.auth.signOut();
+    if (supabase) await supabase.auth.signOut();
     router.replace("/owner/login");
   }
 
