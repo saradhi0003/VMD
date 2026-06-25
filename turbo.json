@@ -1,6 +1,28 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": [".env"],
+  "globalEnv": [
+    "NODE_ENV",
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_PUBLISHABLE_KEY",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_URL",
+    "SUPABASE_SECRET_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "NEXT_PUBLIC_SITE_URL",
+    "MFA_ENFORCED",
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_MODEL_AGENT",
+    "ANTHROPIC_MODEL_FAST",
+    "INNGEST_EVENT_KEY",
+    "INNGEST_SIGNING_KEY",
+    "WHATSAPP_PHONE_NUMBER_ID",
+    "WHATSAPP_ACCESS_TOKEN",
+    "WHATSAPP_VERIFY_TOKEN",
+    "WHATSAPP_BUSINESS_ACCOUNT_ID",
+    "FARM_TIMEZONE",
+    "OWNER_WHATSAPP_NUMBER"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
