@@ -90,6 +90,106 @@ export async function extractMilkFromImage(base64: string, mediaType: string): P
   return parseJson(text, text);
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Multi-document Smart Scan: classify a photographed sheet/receipt and extract.
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface ScanMilkRow {
+  animal: string | null; // name or tag as written
+  litres: number | null;
+  fatPct: number | null;
+  shift: "morning" | "evening" | null;
+}
+export interface ScanFeedRow {
+  feedType: string | null;
+  quantity: string | null;
+  animal: string | null;
+}
+export type ScanResult =
+  | { type: "milk_sheet"; confidence: number; rawText: string; rows: ScanMilkRow[] }
+  | { type: "feed_sheet"; confidence: number; rawText: string; rows: ScanFeedRow[] }
+  | { type: "expense"; confidence: number; rawText: string; category: string | null; payee: string | null; amount: number | null; date: string | null; description: string | null }
+  | { type: "other"; confidence: number; rawText: string; title: string | null };
+
+const SCAN_INSTRUCTION =
+  "You read photos of dairy-farm paperwork. First CLASSIFY the document as one of: " +
+  "milk_sheet (a daily milk log with rows of animals + litres), feed_sheet (a feed/fodder log), " +
+  "expense (a bill/receipt/invoice), or other. Then EXTRACT and respond with ONLY a JSON object, no prose:\n" +
+  '- milk_sheet: {"type":"milk_sheet","confidence":0..1,"rows":[{"animal":string|null,"litres":number|null,"fatPct":number|null,"shift":"morning"|"evening"|null}]}\n' +
+  '- feed_sheet: {"type":"feed_sheet","confidence":0..1,"rows":[{"feedType":string|null,"quantity":string|null,"animal":string|null}]}\n' +
+  '- expense: {"type":"expense","confidence":0..1,"category":"feed"|"salaries"|"medication"|"misc"|null,"payee":string|null,"amount":number|null,"date":"YYYY-MM-DD"|null,"description":string|null}\n' +
+  '- other: {"type":"other","confidence":0..1,"title":string|null}\n' +
+  "Include every readable row. amount is the total in rupees. Use null for anything illegible.";
+
+function num(v: unknown): number | null {
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+function str(v: unknown): string | null {
+  return typeof v === "string" && v.trim() ? v.trim() : null;
+}
+
+function parseScan(text: string): ScanResult {
+  let obj: Record<string, unknown> = {};
+  try {
+    const m = text.match(/\{[\s\S]*\}/);
+    obj = JSON.parse(m ? m[0] : text) as Record<string, unknown>;
+  } catch {
+    return { type: "other", confidence: 0, rawText: text, title: null };
+  }
+  const confidence = num(obj.confidence) ?? 0.5;
+  const t = obj.type;
+  if (t === "milk_sheet") {
+    const rows: ScanMilkRow[] = (Array.isArray(obj.rows) ? obj.rows : []).map((r: Record<string, unknown>) => ({
+      animal: str(r.animal),
+      litres: num(r.litres),
+      fatPct: num(r.fatPct),
+      shift: r.shift === "morning" ? "morning" : r.shift === "evening" ? "evening" : null,
+    }));
+    return { type: "milk_sheet", confidence, rawText: text, rows };
+  }
+  if (t === "feed_sheet") {
+    const rows = (Array.isArray(obj.rows) ? obj.rows : []).map((r: Record<string, unknown>) => ({
+      feedType: str(r.feedType),
+      quantity: str(r.quantity),
+      animal: str(r.animal),
+    }));
+    return { type: "feed_sheet", confidence, rawText: text, rows };
+  }
+  if (t === "expense") {
+    return {
+      type: "expense",
+      confidence,
+      rawText: text,
+      category: str(obj.category),
+      payee: str(obj.payee),
+      amount: num(obj.amount),
+      date: str(obj.date),
+      description: str(obj.description),
+    };
+  }
+  return { type: "other", confidence, rawText: text, title: str(obj.title) };
+}
+
+/** Classify + extract a photographed sheet/receipt. Returns `other` (no rows) when the LLM is unset. */
+export async function scanDocument(base64: string, mediaType: string): Promise<ScanResult> {
+  if (!isConfigured()) return { type: "other", confidence: 0, rawText: "", title: null };
+  const res = await anthropic.messages.create({
+    model: MODEL_FAST,
+    max_tokens: 1500,
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: mediaType as "image/jpeg", data: base64 } },
+          { type: "text", text: SCAN_INSTRUCTION },
+        ],
+      },
+    ],
+  });
+  const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("");
+  return parseScan(text);
+}
+
 /** Parse a spoken/typed milk entry transcript. Falls back to a regex parser without the LLM. */
 export async function extractMilkFromText(transcript: string): Promise<MilkExtraction> {
   if (!isConfigured()) return regexParse(transcript);

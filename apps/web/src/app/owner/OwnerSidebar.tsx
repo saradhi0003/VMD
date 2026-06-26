@@ -16,6 +16,7 @@ const GROUPS: { heading: string; items: Item[] }[] = [
     heading: "Farm",
     items: [
       { href: "/owner/production", label: "Milk", icon: "M" },
+      { href: "/owner/scan", label: "Smart Scan", icon: "📷" },
       { href: "/owner/herd", label: "Animals", icon: "A" },
       { href: "/owner/sales", label: "Sales", icon: "S" },
       { href: "/owner/expenses", label: "Costs", icon: "C" },

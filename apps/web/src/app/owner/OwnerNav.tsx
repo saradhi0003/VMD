@@ -7,6 +7,7 @@ const items = [
   { href: "/owner/workspace", label: "Workspace" },
   { href: "/owner", label: "Today" },
   { href: "/owner/production", label: "Milk" },
+  { href: "/owner/scan", label: "Scan" },
   { href: "/owner/herd", label: "Animals" },
   { href: "/owner/sales", label: "Sales" },
   { href: "/owner/expenses", label: "Costs" },

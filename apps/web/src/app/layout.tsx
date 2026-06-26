@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, Schibsted_Grotesk, Spline_Sans_Mono } from "next/font/google";
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import "./globals.css";
 
 const serif = Instrument_Serif({
@@ -29,18 +30,26 @@ export const metadata: Metadata = {
   description:
     "Vayumukhi Dairy — a family-owned Indian dairy. We grow our own fodder, we name our cows, and we track every litre — from the shed to your door.",
   manifest: "/manifest.webmanifest",
+  applicationName: "Vayumukhi Dairy",
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "Vayumukhi" },
+  icons: { icon: "/logo.svg", shortcut: "/logo.svg", apple: "/logo.svg" },
 };
 
 export const viewport: Viewport = {
   themeColor: "#173a5c",
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${serif.variable} ${sans.variable} ${mono.variable}`}>
-      <body className="min-h-screen bg-bg font-sans text-ink antialiased">{children}</body>
+      <body className="min-h-screen bg-bg font-sans text-ink antialiased">
+        {children}
+        <ServiceWorkerRegister />
+      </body>
     </html>
   );
 }

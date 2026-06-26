@@ -1,71 +1,50 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { extractMilkFromImage, type MilkExtraction } from "@vmd/llm";
+import { z } from "zod";
 import { requireWorker } from "@/lib/auth";
-import { createSupabaseServer } from "@/lib/supabase-server";
+import { recordAudit } from "@/lib/audit";
+import { bulkInsertFeed, bulkInsertMilk, uploadAndScan } from "@/lib/scan";
 
-/**
- * Smart Scan: store the milk-slip photo, OCR/parse it with Claude vision, record
- * a `scan_events` row, then hand off to the milk form pre-filled with what we read.
- * Degrades gracefully (manual entry) when the LLM is unconfigured or parsing fails.
- */
-export async function scanMilkSlip(formData: FormData) {
+/** Upload + classify any sheet, then hand off to the review screen. */
+export async function processScan(formData: FormData) {
   const session = await requireWorker();
-  const farmId = session.profile.farm_id;
   const file = formData.get("image");
-
   if (!(file instanceof File) || file.size === 0) {
     redirect("/worker/scan?error=no_image");
   }
+  const { scanId } = await uploadAndScan(file, session.profile.farm_id, session.userId);
+  if (!scanId) redirect("/worker/scan?error=scan_failed");
+  redirect(`/worker/scan/review?scanId=${scanId}`);
+}
 
-  const supabase = await createSupabaseServer();
-  const bytes = Buffer.from(await file.arrayBuffer());
-  const mediaType = file.type === "image/png" ? "image/png" : "image/jpeg";
-  const ext = mediaType === "image/png" ? "png" : "jpg";
-  const path = `${farmId}/scans/${crypto.randomUUID()}.${ext}`;
+const MilkRows = z.array(
+  z.object({
+    animal: z.string().nullable(),
+    litres: z.number().nullable(),
+    fatPct: z.number().nullable(),
+    shift: z.enum(["morning", "evening"]).nullable(),
+  }),
+);
 
-  await supabase.storage.from("photos").upload(path, bytes, { contentType: mediaType, upsert: false });
+export async function confirmMilkRows(formData: FormData) {
+  const session = await requireWorker();
+  const scanId = z.string().uuid().parse(formData.get("scanId"));
+  const rows = MilkRows.parse(JSON.parse(String(formData.get("rows") ?? "[]")));
+  const n = await bulkInsertMilk(session.profile.farm_id, session.userId, rows);
+  await recordAudit({ farmId: session.profile.farm_id, userId: session.userId, action: "scan_confirm", entity: "milk_session", entityId: scanId, diff: { count: n } });
+  redirect("/worker?logged=milk");
+}
 
-  let parsed: MilkExtraction;
-  try {
-    parsed = await extractMilkFromImage(bytes.toString("base64"), mediaType);
-  } catch (err) {
-    console.error("[scan] extraction failed", err);
-    parsed = { litres: null, fatPct: null, animalTag: null, animalName: null, shift: null, rawText: "", confidence: 0 };
-  }
+const FeedRows = z.array(
+  z.object({ feedType: z.string().nullable(), quantity: z.string().nullable(), animal: z.string().nullable() }),
+);
 
-  // Map a recognised tag to an animal in this farm.
-  let animalId: string | null = null;
-  if (parsed.animalTag) {
-    const { data: animal } = await supabase
-      .from("animals")
-      .select("id")
-      .eq("farm_id", farmId)
-      .ilike("tag", parsed.animalTag)
-      .maybeSingle();
-    animalId = animal?.id ?? null;
-  }
-
-  const { data: scan } = await supabase
-    .from("scan_events")
-    .insert({
-      farm_id: farmId,
-      user_id: session.userId,
-      image_url: path,
-      ocr_text: parsed.rawText || null,
-      parsed: parsed as unknown,
-      confidence: parsed.confidence,
-    })
-    .select("id")
-    .single();
-
-  const qs = new URLSearchParams();
-  if (parsed.litres != null) qs.set("litres", String(parsed.litres));
-  if (parsed.fatPct != null) qs.set("fatPct", String(parsed.fatPct));
-  if (parsed.shift) qs.set("shift", parsed.shift);
-  if (animalId) qs.set("animalId", animalId);
-  if (scan?.id) qs.set("scanId", scan.id);
-
-  redirect(`/worker/log/milk?${qs.toString()}`);
+export async function confirmFeedRows(formData: FormData) {
+  const session = await requireWorker();
+  const scanId = z.string().uuid().parse(formData.get("scanId"));
+  const rows = FeedRows.parse(JSON.parse(String(formData.get("rows") ?? "[]")));
+  const n = await bulkInsertFeed(session.profile.farm_id, session.userId, rows);
+  await recordAudit({ farmId: session.profile.farm_id, userId: session.userId, action: "scan_confirm", entity: "activity_log:feed", entityId: scanId, diff: { count: n } });
+  redirect("/worker?logged=feed");
 }
