@@ -14,6 +14,7 @@ design system (navy/blue/white; Instrument Serif · Schibsted Grotesk · Spline 
 | Auth, server actions, Supabase clients, Inngest, LLM | [docs/backend.md](docs/backend.md) |
 | Big-picture / layered architecture | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | Tests (Vitest / Playwright / Lighthouse) | [TESTING.md](TESTING.md) |
+| Native mobile shell (Capacitor iOS/Android) | [mobile/README.md](mobile/README.md) |
 | First-time setup / provisioning | [SETUP.md](SETUP.md) |
 | **Spending fewer Claude tokens on this repo** | [docs/working-with-claude.md](docs/working-with-claude.md) |
 
@@ -48,3 +49,5 @@ pnpm build        # prod build — do NOT run while `pnpm dev` is live (corrupts
 - `next.config.ts` sets webpack `extensionAlias` (`.js`→`.ts`) + `transpilePackages`.
 - `recordAudit` + `audit_log` are service-role-only; don't change `workerEmail()` format.
 - Logo: `apps/web/public/logo.svg` (replace to rebrand). The app **can't** ingest an image pasted in chat.
+- **MFA** is enforced only when `MFA_ENFORCED=true` (off in dev/tests); otherwise password login is enough.
+- **Local test DB** (macOS 12): `export DOCKER_API_VERSION=1.49` before `pnpm db:test:*` (engine is API 1.49, CLI wants 1.51); the storage container health-check can false-negative — see [TESTING.md](TESTING.md).

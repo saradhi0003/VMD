@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { extractMilkFromText } from "./extract.js";
+import { extractMilkFromText, scanDocument } from "./extract.js";
 
 /**
  * Without ANTHROPIC_API_KEY, extractMilkFromText falls back to a deterministic
@@ -33,5 +33,23 @@ describe("extractMilkFromText (offline regex fallback)", () => {
   it("always echoes the raw transcript back", async () => {
     const out = await extractMilkFromText("9.0 L");
     expect(out.rawText).toBe("9.0 L");
+  });
+});
+
+/**
+ * Multi-document Smart Scan. With no API key, scanDocument must degrade to an
+ * empty `other` result (best-effort contract — a scan must never throw / block
+ * the worker). Real classification accuracy is exercised via the live LLM, not here.
+ */
+describe("scanDocument (offline degradation)", () => {
+  beforeEach(() => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "");
+  });
+
+  it("returns an empty 'other' result without an API key", async () => {
+    const out = await scanDocument("ZmFrZQ==", "image/jpeg");
+    expect(out.type).toBe("other");
+    expect(out.confidence).toBe(0);
+    if (out.type === "other") expect(out.title).toBeNull();
   });
 });

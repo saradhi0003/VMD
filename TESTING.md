@@ -40,10 +40,11 @@ pnpm --filter @vmd/web exec playwright install chromium   # browser binaries for
 ```
 
 ### Local Supabase (for E2E + Postgres MCP)
-Requires a container runtime. This machine is macOS 12 / Intel with no Docker — see
-[the runtime note](#container-runtime-on-this-machine) below.
+Needs Docker running. On this macOS 12 / Intel box that means **Docker Desktop 4.41.2** plus a one-time
+env pin — see [the runtime note](#container-runtime-on-this-machine). Then:
 
 ```bash
+export DOCKER_API_VERSION=1.49     # macOS-12 Docker engine is API 1.49; the CLI otherwise demands 1.51
 pnpm db:test:up        # supabase start → Postgres :54322, Studio :54323, applies migrations
 cp .env.test.example .env.test     # then paste the anon + service keys from `supabase status`
 pnpm db:test:seed      # creates demo owner + worker auth users (the profile trigger does the rest)
@@ -71,12 +72,49 @@ already-running server. `global-setup.ts` logs in once as owner + worker and sav
 `tests/.auth/*.json`; specs `test.use({ storageState })` to skip per-test logins.
 
 ### What's covered today
-- **Vitest** — `packages/llm/src/extract.test.ts` (offline regex fallback for scan/voice). Extend by
-  adding `*.test.ts` next to source. To unit-test the zod schemas in `actions.ts`, extract the inline
-  `Input` schema to a `schema.ts` and import it from both the action and the test.
+- **Vitest** — `packages/llm/src/extract.test.ts`: offline regex fallback for voice/text entry **and**
+  `scanDocument` best-effort degradation (no key → empty `other`). Extend by adding `*.test.ts` next to
+  source. To unit-test the zod schemas in `actions.ts`, extract the inline `Input` schema to a `schema.ts`
+  and import it from both the action and the test.
 - **E2E** — owner dashboard/production render; **worker logs a milk session end-to-end** (form →
   server action insert → redirect); API: `/api/health`, WhatsApp webhook verify + no-op POST.
 - **Perf** — marketing home + worker home against Lighthouse budgets.
+
+---
+
+## Testing the latest features
+
+### Smart Scan (multi-document) — `lib/scan.ts`, `packages/llm/extract.ts`
+- **Offline unit** (covered): `scanDocument` returns an empty `other` result with no `ANTHROPIC_API_KEY`
+  (`extract.test.ts`). Classification into milk_sheet / feed_sheet / expense only runs with a real key, so
+  in CI assert *shape/contract*, not accuracy.
+- **E2E** (local DB): owner/worker `…/scan` → upload an image (`ScanUploader`) → `…/scan/review`
+  (`ScanReviewTable`) → confirm → `bulkInsertMilk` / `bulkInsertFeed` writes rows. Drive with Playwright MCP
+  first to pin selectors; use a fixed fixture under `apps/web/tests/fixtures/`. `uploadAndScan` needs
+  **Storage running** (see the storage caveat in the runtime note).
+- `bulkInsertMilk` resolves written animal names/tags → ids — worth a focused integration test once the DB
+  is up (the seed has animals like `VD-C01`).
+
+### PWA (installable / offline) — `public/manifest.webmanifest`, `public/sw.js`, `ServiceWorkerRegister`
+- **E2E** (no DB needed): `GET /manifest.webmanifest` → 200 and the home `<head>` links it; `GET /sw.js` →
+  200; after load, `navigator.serviceWorker.getRegistration()` resolves (the `ServiceWorkerRegister` client
+  component registers it). Service workers run on **localhost or HTTPS** — Playwright's localhost is fine.
+- **Lighthouse**: add the `pwa` category to `tests/perf/load.spec.ts` thresholds to guard installability.
+
+### Native mobile shell (Capacitor) — `mobile/`
+The shell loads the **hosted** web app in a WebView, so **the web E2E suite *is* the mobile test**. Beyond that:
+- Build smoke: `cd mobile && npm install && npx cap add ios android && npx cap sync` must succeed.
+- Device/simulator runs need Xcode 15+ (iOS) / Android Studio + JDK 17 (Android) — manual, not in CI. See
+  [mobile/README.md](mobile/README.md).
+- `mobile/` is **standalone** (not in the pnpm workspace), so it never affects the web build or `pnpm test`.
+
+### MFA (TOTP) + disabled accounts — `middleware.ts`, migration `…_user_status`
+- MFA is **off by default**; the middleware enforces it only when `MFA_ENFORCED=true`. Leave it unset in
+  `.env.test` so password login works (current E2E). To test the flow: set `MFA_ENFORCED=true`, then E2E
+  `/owner` → redirect `/mfa/enroll`; generate a TOTP code from the enroll secret with `otplib` and verify at
+  `/mfa` (add `otplib` as a dev dep for that spec).
+- **Disabled accounts**: set a seeded user's `profiles.status = 'disabled'`, then E2E asserts `/owner` (or
+  `/worker`) redirects to `…/login?error=account_disabled`.
 
 ---
 
@@ -97,8 +135,21 @@ macOS 12.7.6 / Intel. Current Docker Desktop needs macOS 13+, so install the **l
 build, Docker Desktop 4.41.2** (4.42.0 raised the floor to Ventura 13.3):
 
 - Intel `.dmg`: <https://desktop.docker.com/mac/main/amd64/191736/Docker.dmg>
-- Install → drag to Applications → launch → accept the license → wait for the whale icon to settle.
+- Install → drag to Applications → **launch it** (installing ≠ running — the engine and the `docker` CLI
+  only appear on first launch) → accept the license + the privileged-helper password prompt → wait for the
+  whale icon to settle.
 
-Then `pnpm db:test:up` works. Until Docker is running, the **Vitest layer and Playwright MCP still work
-without it** (MCP can drive the app against the existing cloud Supabase); only the write-path E2E and
-Postgres MCP need the local DB.
+Two macOS-12 quirks once Docker is running:
+1. **Docker API version.** 4.41.2 ships engine 28.1.1 = **API 1.49**, but the Supabase CLI asks for **1.51**.
+   `export DOCKER_API_VERSION=1.49` before any `supabase` / `pnpm db:test:*` command (put it in your shell
+   profile to make it stick), else you get `500 … check if the server supports the requested API version`.
+2. **Storage health-check false-negative.** `supabase start` may print
+   `supabase_storage_… is not ready: unhealthy` and roll the stack back — even though the storage container
+   logs `Server listening` + `[Server] Started Successfully`. It's the CLI's Docker HEALTHCHECK probe
+   misfiring on this older engine, not a real crash. If it bites: retry `pnpm db:test:up`; if persistent,
+   add `[storage.image_transformation]` `enabled = false` to `config.toml` to drop the imgproxy dependency
+   the probe waits on. `config.toml` deliberately keeps **storage enabled** (the init migration inserts a
+   `storage.buckets` row) and **analytics disabled** (lean test stack).
+
+Until the local DB is up, the **Vitest layer and Playwright MCP still work without it** (MCP can drive the
+app against the cloud Supabase); only the write-path E2E and Postgres MCP need the local DB.
