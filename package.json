@@ -19,7 +19,10 @@
     "test:all": "pnpm test && pnpm test:e2e && pnpm test:perf",
     "db:test:up": "supabase start",
     "db:test:reset": "supabase db reset",
-    "db:test:seed": "pnpm --filter @vmd/web seed:auth"
+    "db:test:seed": "pnpm --filter @vmd/web seed:auth",
+    "verify": "node scripts/verify-stack.mjs",
+    "verify:integration": "vitest run --config vitest.integration.config.ts",
+    "verify:app": "APP_URL=http://localhost:3000 node scripts/verify-stack.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.7.4",
