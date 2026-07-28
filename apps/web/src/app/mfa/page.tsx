@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@vmd/supabase";
+import { safeNextPath } from "@/lib/safe-redirect";
 
 export default function MfaChallengePage() {
   return (
@@ -14,7 +15,9 @@ export default function MfaChallengePage() {
 
 function MfaChallenge() {
   const router = useRouter();
-  const next = useSearchParams().get("next") || "/";
+  // Sanitised — a raw `next` here would let a crafted /mfa?next=… link bounce
+  // the user off-site the moment their session reaches AAL2.
+  const next = safeNextPath(useSearchParams().get("next"), "/");
 
   const [factorId, setFactorId] = useState<string | null>(null);
   const [code, setCode] = useState("");

@@ -15,8 +15,9 @@ export function createServerClient(cookies: {
   set: (name: string, value: string, options?: CookieOptions) => void;
 }): SupabaseClient<Database> {
   const url = requireEnv("NEXT_PUBLIC_SUPABASE_URL");
+  // `||` not `??` — an empty `FOO=""` in .env must fall through to the alias.
   const publishableKey =
-    process.env.NEXT_PUBLIC_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    process.env.NEXT_PUBLIC_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!publishableKey) {
     throw new Error("Neither NEXT_PUBLIC_PUBLISHABLE_KEY nor NEXT_PUBLIC_SUPABASE_ANON_KEY is set");
   }

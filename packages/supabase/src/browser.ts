@@ -13,7 +13,8 @@ let cached: SupabaseClient<Database> | null = null;
 export function createBrowserClient(): SupabaseClient<Database> | null {
   if (cached) return cached;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // `||` not `??` — an empty `FOO=""` in .env must fall through to the alias.
+  const key = process.env.NEXT_PUBLIC_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) {
     if (typeof console !== "undefined") {
       console.error("[supabase] browser client unavailable — NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_PUBLISHABLE_KEY missing in the client bundle");

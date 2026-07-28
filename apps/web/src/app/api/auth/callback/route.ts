@@ -1,11 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase-server";
+import { safeNextPath } from "@/lib/safe-redirect";
 
 /** Supabase OAuth + magic-link callback. */
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const next = url.searchParams.get("next") ?? "/owner";
+  // MUST be sanitised: `new URL(next, base)` happily returns an off-site URL for
+  // an absolute or protocol-relative `next`, which would bounce a just-signed-in
+  // user to a look-alike domain. See lib/safe-redirect.ts.
+  const next = safeNextPath(url.searchParams.get("next"), "/owner");
 
   if (code) {
     const supabase = await createSupabaseServer();

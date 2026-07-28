@@ -11,8 +11,12 @@ let cached: SupabaseClient<Database> | null = null;
  */
 export function createServiceClient(): SupabaseClient<Database> {
   if (cached) return cached;
-  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // `||`, NOT `??`. `.env` files ship unused vars as `FOO=""`, and `??` only
+  // falls back on null/undefined — so an empty SUPABASE_URL would *win* the
+  // fallback and then fail the check below, taking down every service-role
+  // path (audit, webhooks, Inngest jobs, worker milk logging).
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url) throw new Error("SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) is not set");
   if (!key) throw new Error("SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY) is not set");
 

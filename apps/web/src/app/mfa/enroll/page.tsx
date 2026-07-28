@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@vmd/supabase";
+import { safeNextPath } from "@/lib/safe-redirect";
 
 export default function MfaEnrollPage() {
   return (
@@ -14,7 +15,8 @@ export default function MfaEnrollPage() {
 
 function MfaEnroll() {
   const router = useRouter();
-  const next = useSearchParams().get("next") || "/";
+  // Sanitised — see lib/safe-redirect.ts.
+  const next = safeNextPath(useSearchParams().get("next"), "/");
 
   const [qr, setQr] = useState<string | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
