@@ -45,7 +45,44 @@ SUPABASE_URL=""
 
 ---
 
-## 2. Claude (Anthropic)
+## 1b. SMTP (optional — admin access-request emails)
+
+Two separate things, don't confuse them:
+
+**Auth emails** (magic links, invites, OTP) — **dashboard only, no code**:
+Supabase → **Authentication → Emails → SMTP settings**. Point it at Gmail (App Password) or
+Resend/SendGrid so invites stop hitting Supabase's rate-limited default sender.
+
+**Admin "someone requested access"** — env vars, delivered by the `access-request-notify` Inngest job:
+```env
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT="465"
+SMTP_USER="you@gmail.com"
+SMTP_PASS=""          # Gmail App Password, NOT your account password
+SMTP_FROM="Vayumukhi Dairy <you@gmail.com>"
+ADMIN_EMAIL="you@gmail.com"
+```
+Leave blank and everything still works — the request appears in **/owner/team**, which is the source
+of truth. Email is a convenience, never a dependency.
+
+---
+
+## 2. LLM — pick one (or neither)
+
+### Option A — free, self-hosted (no card, no spend)
+
+```env
+LLM_PROVIDER="openai-compat"
+LLM_BASE_URL="https://xxxx.trycloudflare.com/v1"
+LLM_API_KEY=""
+```
+
+Open [`infra/colab/vayumukhi-llm-server.ipynb`](infra/colab/README.md) in Google Colab, set
+**Runtime → T4 GPU**, run it top to bottom, and paste the block it prints. Serves Qwen2.5-VL-7B for
+Smart Scan + the agent. Caveats: the URL rotates every session and scans take 30–90 s —
+see [infra/colab/README.md](infra/colab/README.md).
+
+### Option B — hosted Claude (costs money, much faster)
 
 ```env
 ANTHROPIC_API_KEY=""
@@ -54,6 +91,9 @@ ANTHROPIC_API_KEY=""
 1. Sign up at https://console.anthropic.com.
 2. Add payment method (daily agent ~$0.01–0.05/day at this farm's scale).
 3. **API Keys → Create Key** → paste.
+
+`LLM_BASE_URL` takes precedence when both are set. With **neither**, the app still runs: voice/assistant
+use the offline regex parser and scans return an empty `other` result.
 
 ---
 
@@ -137,5 +177,5 @@ Visit:
 
 - WhatsApp credentials (send job no-ops without them)
 - Inngest signing keys (use the dev server locally)
-- Anthropic key (only needed when triggering the agent)
+- An LLM provider (only needed for the agent + Smart Scan; both degrade gracefully without one)
 - Google OAuth (email magic link works on its own)

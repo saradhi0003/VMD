@@ -15,6 +15,8 @@ design system (navy/blue/white; Instrument Serif · Schibsted Grotesk · Spline 
 | Big-picture / layered architecture | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | Tests (Vitest / Playwright / Lighthouse) | [TESTING.md](TESTING.md) |
 | Native mobile shell (Capacitor iOS/Android) | [mobile/README.md](mobile/README.md) |
+| Running the LLM free on Colab (open-source models) | [infra/colab/README.md](infra/colab/README.md) |
+| MFA / approval-gate pattern (portable) | [skills/mfa-totp/SKILL.md](skills/mfa-totp/SKILL.md) |
 | First-time setup / provisioning | [SETUP.md](SETUP.md) |
 | **Spending fewer Claude tokens on this repo** | [docs/working-with-claude.md](docs/working-with-claude.md) |
 
@@ -32,10 +34,13 @@ pnpm build        # prod build — do NOT run while `pnpm dev` is live (corrupts
 1. **RSC by default**; only interactive bits are `"use client"`. Reads happen server-side.
 2. **Server Actions are the write API**: `requireOwner()/requireWorker()` → zod parse → mutate →
    `recordAudit()` → `emit(...)` (never `inngest.send`) → `revalidatePath`. Pattern: `app/worker/log/milk/actions.ts`.
-3. **RLS is authz** — everything is farm-scoped; bypass only via the **service client** (jobs/webhooks/audit).
+3. **RLS is authz** — everything is farm-scoped **and approval-gated**
+   (`farm_id = current_farm_id() and is_approved()`). Bypass only via the **service client**
+   (jobs/webhooks/audit) — and any code holding it MUST re-verify the JWT + re-check approval via
+   `@/lib/guard`. UI gates are UX; the database is the lock.
 4. **UI** from `@/components/ui` + Pure tokens (`navy/blue/ink/surface/line`, `font-serif`, `eyebrow`). No off-palette colours/fonts.
 5. **Orchestrator + LLM are best-effort**: `emit()` swallows Inngest failures; the LLM degrades to a regex
-   fallback without `ANTHROPIC_API_KEY`. Never let either break a user action.
+   fallback when **no provider** is configured. Never let either break a user action.
 6. Keep `pnpm typecheck` green. **Don't commit/push unless asked.**
 
 ## Demo logins (DB must have migrations applied — see SETUP.md)
@@ -50,4 +55,9 @@ pnpm build        # prod build — do NOT run while `pnpm dev` is live (corrupts
 - `recordAudit` + `audit_log` are service-role-only; don't change `workerEmail()` format.
 - Logo: `apps/web/public/logo.svg` (replace to rebrand). The app **can't** ingest an image pasted in chat.
 - **MFA** is enforced only when `MFA_ENFORCED=true` (off in dev/tests); otherwise password login is enough.
+- **Approval gate**: new self-signups land `status='pending'` and read nothing until an owner approves
+  them at `/owner/team`. Migration 0005 backfilled all pre-existing users to `active`.
+- **SMTP is best-effort** — unset means notifications skip silently; approval never depends on email.
+- **LLM provider**: `LLM_BASE_URL` (self-hosted, free) beats `ANTHROPIC_API_KEY`; neither → regex fallback.
+  The Colab tunnel URL **rotates every session** — re-paste it into `.env.local` and restart `pnpm dev`.
 - **Local test DB** (macOS 12): `export DOCKER_API_VERSION=1.49` before `pnpm db:test:*` (engine is API 1.49, CLI wants 1.51); the storage container health-check can false-negative — see [TESTING.md](TESTING.md).

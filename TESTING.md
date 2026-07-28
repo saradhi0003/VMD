@@ -72,10 +72,17 @@ already-running server. `global-setup.ts` logs in once as owner + worker and sav
 `tests/.auth/*.json`; specs `test.use({ storageState })` to skip per-test logins.
 
 ### What's covered today
-- **Vitest** — `packages/llm/src/extract.test.ts`: offline regex fallback for voice/text entry **and**
-  `scanDocument` best-effort degradation (no key → empty `other`). Extend by adding `*.test.ts` next to
-  source. To unit-test the zod schemas in `actions.ts`, extract the inline `Input` schema to a `schema.ts`
-  and import it from both the action and the test.
+- **Vitest** — all offline, no DB, no network:
+  - `packages/llm/src/extract.test.ts` — offline regex fallback for voice/text entry **and**
+    `scanDocument` best-effort degradation (no provider → empty `other`).
+  - `packages/llm/src/provider.test.ts` — provider selection precedence + the OpenAI-compatible
+    request shape (`fetch` stubbed).
+  - `apps/web/src/lib/guard.test.ts` — **the backend twin**: bearer-token rejection, approval refusal
+    for pending/disabled, cross-farm blocking, rate limiting, and graceful pre-migration degradation.
+  - `apps/web/src/lib/upload.test.ts` — extension/MIME allow-list, size cap, per-user rate limit.
+
+  Extend by adding `*.test.ts` next to source. To unit-test the zod schemas in `actions.ts`, extract the
+  inline `Input` schema to a `schema.ts` and import it from both the action and the test.
 - **E2E** — owner dashboard/production render; **worker logs a milk session end-to-end** (form →
   server action insert → redirect); API: `/api/health`, WhatsApp webhook verify + no-op POST.
 - **Perf** — marketing home + worker home against Lighthouse budgets.
@@ -114,7 +121,36 @@ The shell loads the **hosted** web app in a WebView, so **the web E2E suite *is*
   `/owner` → redirect `/mfa/enroll`; generate a TOTP code from the enroll secret with `otplib` and verify at
   `/mfa` (add `otplib` as a dev dep for that spec).
 - **Disabled accounts**: set a seeded user's `profiles.status = 'disabled'`, then E2E asserts `/owner` (or
-  `/worker`) redirects to `…/login?error=account_disabled`.
+  `/worker`) redirects to `/pending`.
+
+### Approval gate — migration `…_approval_gate`
+**The one test that actually matters** is the raw-API one, because it proves RLS (not the UI) is the lock:
+
+```bash
+# As a PENDING user's token — must return [] for every table, not a 403 and not data.
+curl -s "$SUPABASE_URL/rest/v1/milk_sessions?select=*" \
+  -H "apikey: $PUBLISHABLE_KEY" -H "Authorization: Bearer $PENDING_USER_JWT"
+# → []
+```
+Then flip `profiles.status` to `'active'` and re-run — rows appear. If the pending call returns data,
+the gate is not applied; re-run migration 0005.
+
+The SQL was validated by applying all five migrations to a throwaway Postgres with Supabase-shaped
+stubs (`auth.uid()`, `storage.foldername`) and asserting a pending user sees 0 rows across
+`milk_sessions`/`animals`/`farms` while an approved one sees them and can insert. Repeat with:
+```bash
+export DOCKER_API_VERSION=1.49
+docker run -d --name vmd-sqlcheck -e POSTGRES_PASSWORD=pw -e POSTGRES_DB=vmd postgres:15-alpine
+# apply prelude stubs, then migrations 0001, 0003, 0004, 0005 in order
+```
+
+**Backend twin**: hit any service-role path with (a) no `Authorization` header and (b) a valid but
+pending JWT — both must be refused. Covered as unit tests in `apps/web/src/lib/guard.test.ts`.
+
+### Biometric app lock — `components/AppLock.tsx`
+Browser: renders nothing (`isNativeApp()` is false) — assert no lock overlay in E2E.
+Device: cold start prompts; background >60 s then return prompts again; **a device with no enrolled
+biometric must still get in** (that's the deliberate fail-open).
 
 ---
 

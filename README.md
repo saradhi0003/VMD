@@ -20,13 +20,17 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the layer-by-layer detail.
 ```
 apps/web/             Next.js — marketing + /owner + /worker + API routes
 packages/supabase/    Supabase client factories + DB types
-packages/llm/         Claude prompts, tools, daily-agent caller
-packages/jobs/        Inngest functions
+packages/llm/         Provider adapter (self-hosted | Claude), prompts, tools, extraction
+packages/jobs/        Inngest functions + mailer
 supabase/             SQL migrations + Supabase CLI config
+mobile/               Capacitor native shell (iOS + Android)
+infra/                Colab LLM server, docker-compose
+skills/               Portable pattern docs (MFA + approval gate)
+archive/              Not built, not served — kept for reference only
 ```
 
-Legacy static prototype (`index.html`, `app.html`, `worker.html`, etc.) remains
-during the cutover; remove once the Next.js port reaches parity.
+The legacy static prototype has been retired to [archive/prototype-2026-05/](archive/README.md) now
+that the Next.js port is at parity.
 
 ## Local development
 

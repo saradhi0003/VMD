@@ -23,7 +23,7 @@ mono micro-labels. Authentication is **invite-only with mandatory TOTP MFA**.
 | Realtime | Supabase Realtime → server-refresh subscriber (`RealtimeRefresher`) |
 | Charts | Recharts (lazy-loaded — milk trend, revenue/expense, sparklines) |
 | Orchestration | Inngest (cron + event-driven, durable steps) |
-| LLM | Anthropic Claude (Sonnet 4.6 daily agent · Haiku 4.5 scan/voice; regex fallback offline) |
+| LLM | Pluggable — self-hosted Qwen2.5-VL-7B (free, Colab/vLLM) or Anthropic Claude; regex fallback offline |
 | Storage | Supabase Storage (`photos`, `voice` buckets — farm-scoped via RLS) |
 | Messaging | Meta Cloud API (WhatsApp) |
 | Testing | Vitest (unit) · Playwright (E2E + Lighthouse) · Playwright/Postgres MCP (live drivers) |
@@ -47,7 +47,7 @@ apps/web/
   public/                   logo.svg + product/hero photos
 packages/
   supabase/                server / browser / service clients + hand-rolled DB types
-  llm/                     Claude client, prompts, tools, daily agent, scan/voice + regex extraction
+  llm/                     provider adapter (self-hosted | Claude), prompts, tools, daily agent, scan/voice
   jobs/                    Inngest client (client.ts, exports emit()) + functions
 supabase/
   config.toml              CLI config (+ [auth.mfa])
@@ -141,9 +141,15 @@ update member role/status; `audit_log` insert is service-role only; `notificatio
 via service client). Service role bypasses RLS for jobs/webhooks/admin.
 
 ## 6. LLM Layer (`@vmd/llm`)
-`anthropic` client; `MODEL_AGENT` sonnet-4-6, `MODEL_FAST` haiku-4-5. `runDailyAgent(snapshot)` → findings
-(tool-forced). `extractMilkFromImage` (vision OCR). `extractMilkFromText` (assistant/voice) with a **regex
-fallback** when `ANTHROPIC_API_KEY` is unset, so the app never hard-fails offline.
+All calls funnel through `chatJson()` (`src/provider.ts`), which resolves one of two backends:
+**`openai-compat`** (any OpenAI-compatible `/v1` server — by default a free Qwen2.5-VL-7B-AWQ on a
+Colab T4, see `infra/colab/`) or **`anthropic`** (Sonnet 4.6 / Haiku 4.5). `LLM_BASE_URL` wins over
+`ANTHROPIC_API_KEY`; `LLM_PROVIDER` forces a choice.
+
+`runDailyAgent(snapshot)` → findings. `scanDocument()` → Smart Scan classify+extract.
+`extractMilkFromText()` → assistant/voice, with a **regex fallback** when no provider is configured,
+so the app never hard-fails offline. Responses are schema-constrained (`response_format: json_schema`
+on the self-hosted path, a forced tool on Anthropic) and re-validated by `parseJson`/`parseScan`.
 
 ## 7. Orchestration Layer (Inngest — `@vmd/jobs`)
 Served at `/api/inngest`. Events: `farm/daily-agent.requested`, `milk-session/created`,
