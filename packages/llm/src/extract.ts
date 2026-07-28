@@ -1,4 +1,5 @@
-import { anthropic, MODEL_FAST } from "./index.js";
+import { activeProvider, chatJson } from "./provider.js";
+import { MILK_EXTRACTION_SCHEMA, SCAN_RESULT_SCHEMA } from "./tools.js";
 
 /** Structured fields pulled from a milk slip photo or a spoken entry. */
 export interface MilkExtraction {
@@ -48,7 +49,7 @@ function parseJson(text: string, rawText: string): MilkExtraction {
 }
 
 function isConfigured(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY);
+  return activeProvider() !== "none";
 }
 
 /** Offline fallback parser (no API key): pulls litres / fat% / shift from plain text. */
@@ -70,24 +71,14 @@ function regexParse(text: string): MilkExtraction {
 /** OCR + parse a milk-slip photo. Returns empty extraction if the LLM is unset. */
 export async function extractMilkFromImage(base64: string, mediaType: string): Promise<MilkExtraction> {
   if (!isConfigured()) return { ...EMPTY };
-  const res = await anthropic.messages.create({
-    model: MODEL_FAST,
-    max_tokens: 512,
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "image",
-            source: { type: "base64", media_type: mediaType as "image/jpeg", data: base64 },
-          },
-          { type: "text", text: INSTRUCTION },
-        ],
-      },
-    ],
+  const res = await chatJson({
+    user: INSTRUCTION,
+    image: { base64, mediaType },
+    maxTokens: 512,
+    fast: true,
+    jsonSchema: { name: "milk_extraction", schema: MILK_EXTRACTION_SCHEMA as unknown as Record<string, unknown> },
   });
-  const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("");
-  return parseJson(text, text);
+  return parseJson(res.text, res.text);
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -173,31 +164,24 @@ function parseScan(text: string): ScanResult {
 /** Classify + extract a photographed sheet/receipt. Returns `other` (no rows) when the LLM is unset. */
 export async function scanDocument(base64: string, mediaType: string): Promise<ScanResult> {
   if (!isConfigured()) return { type: "other", confidence: 0, rawText: "", title: null };
-  const res = await anthropic.messages.create({
-    model: MODEL_FAST,
-    max_tokens: 1500,
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "image", source: { type: "base64", media_type: mediaType as "image/jpeg", data: base64 } },
-          { type: "text", text: SCAN_INSTRUCTION },
-        ],
-      },
-    ],
+  const res = await chatJson({
+    user: SCAN_INSTRUCTION,
+    image: { base64, mediaType },
+    maxTokens: 1500,
+    fast: true,
+    jsonSchema: { name: "scan_result", schema: SCAN_RESULT_SCHEMA as unknown as Record<string, unknown> },
   });
-  const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("");
-  return parseScan(text);
+  return parseScan(res.text);
 }
 
 /** Parse a spoken/typed milk entry transcript. Falls back to a regex parser without the LLM. */
 export async function extractMilkFromText(transcript: string): Promise<MilkExtraction> {
   if (!isConfigured()) return regexParse(transcript);
-  const res = await anthropic.messages.create({
-    model: MODEL_FAST,
-    max_tokens: 512,
-    messages: [{ role: "user", content: `${INSTRUCTION}\n\nEntry: "${transcript}"` }],
+  const res = await chatJson({
+    user: `${INSTRUCTION}\n\nEntry: "${transcript}"`,
+    maxTokens: 512,
+    fast: true,
+    jsonSchema: { name: "milk_extraction", schema: MILK_EXTRACTION_SCHEMA as unknown as Record<string, unknown> },
   });
-  const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("");
-  return parseJson(text, transcript);
+  return parseJson(res.text, transcript);
 }

@@ -121,6 +121,69 @@ export const tools = {
   },
 } as const;
 
+/* ──────────────────────────────────────────────────────────
+   Response schemas for the extraction calls.
+
+   These are NOT Anthropic tools — they're JSON Schemas handed
+   to an OpenAI-compatible server via `response_format`, where
+   they constrain decoding (vLLM/xgrammar) so the model cannot
+   emit invalid JSON. The Anthropic path reuses them as a
+   single forced tool. Same lockstep rule as `tools` above:
+   change the shape here and in `extract.ts` together.
+─────────────────────────────────────────────────────────── */
+
+/** Mirrors the `MilkExtraction` interface in extract.ts (minus `rawText`, which we fill in). */
+export const MILK_EXTRACTION_SCHEMA = {
+  type: "object" as const,
+  properties: {
+    litres: { type: ["number", "null"], description: "Quantity in litres" },
+    fatPct: { type: ["number", "null"], minimum: 0, maximum: 15, description: "Fat percentage" },
+    animalTag: { type: ["string", "null"], description: "Tag/ID like 'VD-C01' if present" },
+    animalName: { type: ["string", "null"] },
+    shift: { enum: ["morning", "evening", null] },
+    confidence: { type: "number", minimum: 0, maximum: 1 },
+  },
+  required: ["litres", "fatPct", "animalTag", "animalName", "shift", "confidence"],
+} as const;
+
+/**
+ * Mirrors the `ScanResult` union in extract.ts — but deliberately FLAT, not a `oneOf`.
+ * Grammar-constrained decoders handle discriminated unions poorly, and `parseScan`
+ * already reads a flat bag (it switches on `type` and ignores irrelevant keys), so a
+ * single object with every branch's fields optional is both safer and parser-compatible.
+ */
+export const SCAN_RESULT_SCHEMA = {
+  type: "object" as const,
+  properties: {
+    type: { enum: ["milk_sheet", "feed_sheet", "expense", "other"] },
+    confidence: { type: "number", minimum: 0, maximum: 1 },
+    // milk_sheet | feed_sheet — the row shapes are merged; unused keys stay absent.
+    rows: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          animal: { type: ["string", "null"] },
+          litres: { type: ["number", "null"] },
+          fatPct: { type: ["number", "null"] },
+          shift: { enum: ["morning", "evening", null] },
+          feedType: { type: ["string", "null"] },
+          quantity: { type: ["string", "null"] },
+        },
+      },
+    },
+    // expense
+    category: { enum: ["feed", "salaries", "medication", "misc", null] },
+    payee: { type: ["string", "null"] },
+    amount: { type: ["number", "null"], description: "Total in rupees" },
+    date: { type: ["string", "null"], description: "YYYY-MM-DD" },
+    description: { type: ["string", "null"] },
+    // other
+    title: { type: ["string", "null"] },
+  },
+  required: ["type", "confidence"],
+} as const;
+
 export type FindingInput = z.infer<typeof FindingSchema>;
 export type RecordFindingsInput = z.infer<typeof RecordFindingsSchema>;
 export type ProposeReminderInput = z.infer<typeof ProposeReminderSchema>;

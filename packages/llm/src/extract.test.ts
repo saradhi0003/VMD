@@ -7,7 +7,11 @@ import { extractMilkFromText, scanDocument } from "./extract.js";
  */
 describe("extractMilkFromText (offline regex fallback)", () => {
   beforeEach(() => {
+    // Clear every provider so these assert the offline path regardless of the
+    // developer's shell env (a live LLM_BASE_URL would otherwise hit the network).
     vi.stubEnv("ANTHROPIC_API_KEY", "");
+    vi.stubEnv("LLM_BASE_URL", "");
+    vi.stubEnv("LLM_PROVIDER", "");
   });
 
   it("pulls litres + fat% + morning shift from an English entry", async () => {
@@ -43,7 +47,11 @@ describe("extractMilkFromText (offline regex fallback)", () => {
  */
 describe("scanDocument (offline degradation)", () => {
   beforeEach(() => {
+    // Clear every provider so these assert the offline path regardless of the
+    // developer's shell env (a live LLM_BASE_URL would otherwise hit the network).
     vi.stubEnv("ANTHROPIC_API_KEY", "");
+    vi.stubEnv("LLM_BASE_URL", "");
+    vi.stubEnv("LLM_PROVIDER", "");
   });
 
   it("returns an empty 'other' result without an API key", async () => {

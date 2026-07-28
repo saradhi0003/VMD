@@ -1,5 +1,5 @@
-import { anthropic, MODEL_AGENT } from "./index.js";
 import { DAILY_AGENT_SYSTEM } from "./prompts.js";
+import { chatJson } from "./provider.js";
 import { tools, RecordFindingsSchema, type FindingInput } from "./tools.js";
 
 /**
@@ -51,30 +51,23 @@ ${snapshot.recentHealthEvents.map((h) => `  ${h.daysAgo}d ago · ${h.animal} · 
 
 Produce findings now. Use the record_findings tool.`;
 
-  const response = await anthropic.messages.create({
-    model: MODEL_AGENT,
-    max_tokens: 2048,
+  const response = await chatJson({
     system: DAILY_AGENT_SYSTEM,
-    tools: [tools.record_findings, tools.propose_reminder, tools.propose_whatsapp_draft],
-    tool_choice: { type: "tool", name: "record_findings" },
-    messages: [{ role: "user", content: userPrompt }],
+    user: userPrompt,
+    maxTokens: 2048,
+    jsonSchema: {
+      name: "record_findings",
+      schema: tools.record_findings.input_schema as unknown as Record<string, unknown>,
+    },
   });
 
-  const toolBlock = response.content.find(
-    (b): b is Extract<typeof b, { type: "tool_use" }> =>
-      b.type === "tool_use" && b.name === "record_findings",
-  );
-  if (!toolBlock) {
-    throw new Error("daily-agent: model did not call record_findings");
-  }
-
-  const parsed = RecordFindingsSchema.parse(toolBlock.input);
+  const parsed = RecordFindingsSchema.parse(JSON.parse(response.text));
 
   return {
     findings: parsed.findings,
-    inputTokens: response.usage.input_tokens,
-    outputTokens: response.usage.output_tokens,
+    inputTokens: response.inputTokens,
+    outputTokens: response.outputTokens,
     model: response.model,
-    raw: response,
+    raw: response.raw,
   };
 }
