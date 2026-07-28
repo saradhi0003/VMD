@@ -1,0 +1,134 @@
+name: Build Android APK
+
+# Produces a downloadable, installable APK without needing an Android SDK on
+# your machine — the Capacitor equivalent of FinTracker's `eas build --profile
+# preview` link.
+#
+# Two ways to get a build:
+#   • Actions → "Build Android APK" → Run workflow   → APK as a run artifact
+#     (downloadable for 90 days, needs a GitHub login)
+#   • git tag v1.0.0 && git push --tags             → APK attached to a public
+#     GitHub Release with a permanent, login-free download URL
+#
+# The shell loads the HOSTED web app (capacitor.config.ts → server.url), so most
+# app updates ship by deploying the web app — no new APK, no store review. Only
+# native changes (plugins, icon, permissions) need a rebuild.
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_url:
+        description: "Web app URL the shell loads (blank = capacitor.config.ts default)"
+        required: false
+        type: string
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # needed to attach the APK to a Release
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17" # Capacitor 6 / AGP 8 target JDK 17, not newer
+          distribution: temurin
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Capacitor dependencies
+        run: npm ci || npm install
+
+      - name: Point the shell at a different origin
+        if: inputs.server_url != ''
+        env:
+          SERVER_URL: ${{ inputs.server_url }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            const p = "capacitor.config.ts";
+            const target = new URL(process.env.SERVER_URL);
+            let s = fs.readFileSync(p, "utf8");
+            // Rewrite server.url and keep allowNavigation in step, otherwise the
+            // WebView refuses to load the new origin.
+            s = s.replace(/url:\s*"[^"]*"/, `url: "${target.origin}"`);
+            s = s.replace(/allowNavigation:\s*\[[^\]]*\]/,
+              `allowNavigation: ["${target.hostname}", "*.supabase.co"]`);
+            fs.writeFileSync(p, s);
+            console.log(s.split("\n").filter(l => /url:|allowNavigation/.test(l)).join("\n"));
+          '
+
+      - name: Sync native project
+        run: npx cap sync android
+
+      - name: Build debug APK
+        # Debug-signed so it installs by sideload with no keystore. This mirrors
+        # EAS's `preview` profile (distribution: internal). For Play Store you
+        # want a signed release AAB — see the commented job below.
+        run: ./gradlew --no-daemon assembleDebug
+        working-directory: mobile/android
+
+      - name: Name the artifact
+        id: name
+        run: |
+          VER="${GITHUB_REF_NAME//\//-}"
+          echo "apk=vayumukhi-dairy-${VER}.apk" >> "$GITHUB_OUTPUT"
+
+      - name: Stage APK
+        run: |
+          mkdir -p ../dist
+          cp android/app/build/outputs/apk/debug/app-debug.apk "../dist/${{ steps.name.outputs.apk }}"
+          ls -lh ../dist
+
+      - name: Upload as run artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: dist/*.apk
+          retention-days: 90
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: mobile/dist/*.apk
+          generate_release_notes: true
+          body: |
+            ### Install on Android
+
+            1. Download the `.apk` below on your phone.
+            2. Open it. Android will ask to allow installs from this source — allow it.
+            3. Open **Vayumukhi Dairy** and sign in.
+
+            This build loads the hosted web app, so day-to-day updates arrive
+            automatically when the site is deployed. You only need a new APK when
+            native bits change (plugins, icon, permissions).
+
+            > Unsigned debug build for sideloading — not a Play Store release.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Play Store release (when you're ready):
+#
+#   1. Generate a keystore ONCE and keep it safe — losing it means you can never
+#      update the listing again:
+#        keytool -genkey -v -keystore vmd.keystore -alias vmd \
+#          -keyalg RSA -keysize 2048 -validity 10000
+#   2. Add repo secrets: KEYSTORE_BASE64 (base64 of the file), KEYSTORE_PASSWORD,
+#      KEY_ALIAS, KEY_PASSWORD.
+#   3. Swap `assembleDebug` for `bundleRelease` and sign, then upload the .aab to
+#      Play Console → Internal testing.
+#
+# Note for a new personal Play account: 12 testers for 14 continuous days before
+# you can promote to production. Start that clock early.
+# ─────────────────────────────────────────────────────────────────────────────

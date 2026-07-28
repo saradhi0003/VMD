@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Vayumukhi Dairy</string>
+    <string name="title_activity_main">Vayumukhi Dairy</string>
+    <string name="package_name">in.vayumukhi.app</string>
+    <string name="custom_url_scheme">in.vayumukhi.app</string>
+</resources>

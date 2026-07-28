@@ -1,5 +1,55 @@
 # Vayumukhi Dairy — mobile (Capacitor)
 
+## 📲 Getting an installable APK (no Android SDK needed)
+
+The Android project is committed, and **GitHub Actions builds the APK for you** —
+this repo's equivalent of FinTracker's `eas build --profile preview` link. You do
+**not** need Android Studio or the SDK on your Mac.
+
+### Option A — one-off build (fastest)
+**Actions → Build Android APK → Run workflow.** ~5 minutes. The APK lands under
+that run's **Artifacts** as `android-apk`. Downloadable for 90 days; requires a
+GitHub login, so it's best for testing on your own devices.
+
+Optionally pass a **server URL** to point the shell at a different origin
+(staging, a custom domain) without editing any files.
+
+### Option B — a public download link (share with the farm)
+```bash
+git tag v1.0.0
+git push --tags
+```
+The workflow attaches the APK to a **GitHub Release**, giving a permanent,
+login-free URL anyone can open on their phone:
+
+```
+https://github.com/saradhi0003/VMD/releases/latest
+```
+
+### Installing on the phone
+1. Open the `.apk` link on the Android device.
+2. Android warns about installing from an unknown source — allow it for your
+   browser. (Expected: this is a sideload, not a Play Store install.)
+3. Open **Vayumukhi Dairy** and sign in.
+
+> The build is **debug-signed** so it installs without a keystore — the same
+> role EAS's `preview`/`distribution: internal` profile plays. For the Play
+> Store you need a signed release AAB; the workflow file documents that path.
+
+### Why you rarely need a new APK
+The shell loads the **hosted** web app (`server.url`), so shipping a web deploy
+updates every installed phone instantly — no rebuild, no store review. That's the
+same JS-vs-native split Expo's OTA gives you, without a second client to maintain.
+Only native changes need a fresh APK: plugins, permissions, icon, `server.url`.
+
+### iOS
+No equivalent free path — an `.ipa` needs an Apple Developer account ($99/yr) and
+TestFlight. Until then, iPhone users can **Add to Home Screen** from Safari; the
+app is already an installable PWA (`apps/web/public/manifest.webmanifest`).
+
+---
+
+
 A native iOS + Android shell that loads the **hosted** web app (`capacitor.config.ts` → `server.url`) in a
 WebView, adding native **camera** (Smart Scan), **push notifications**, and **deep links**. The SSR app does
 not need a static export. This folder is **standalone** (not part of the pnpm workspace, so it never affects

@@ -36,3 +36,7 @@ mobile/android/app/build/
 mobile/android/build/
 mobile/android/local.properties
 mobile/resources/
+
+# Capacitor build outputs (the android/ project itself IS committed so CI can build it)
+mobile/dist/
+mobile/android/app/release/
