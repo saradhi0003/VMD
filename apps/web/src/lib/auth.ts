@@ -44,9 +44,25 @@ export async function getSession(): Promise<SessionContext | null> {
   return loadSession();
 }
 
+/**
+ * Approval gate, server-component half.
+ *
+ * The real lock is `is_approved()` compiled into every RLS policy (migration
+ * 0005) — an unapproved session already reads zero rows. This exists so the
+ * person lands on a screen that explains why, instead of an empty dashboard.
+ *
+ * Pre-migration databases have no `status`, which surfaces as `undefined`;
+ * treat that as approved so the app keeps working (graceful degradation).
+ */
+function assertApproved(s: SessionContext): void {
+  const status = (s.profile as { status?: string }).status;
+  if (status === "pending" || status === "disabled") redirect("/pending");
+}
+
 export async function requireOwner(): Promise<SessionContext> {
   const s = await loadSession();
   if (!s) redirect("/owner/login");
+  assertApproved(s);
   if (s.profile.role !== "owner") redirect("/worker");
   return s;
 }
@@ -54,6 +70,7 @@ export async function requireOwner(): Promise<SessionContext> {
 export async function requireWorker(): Promise<SessionContext> {
   const s = await loadSession();
   if (!s) redirect("/worker/login");
+  assertApproved(s);
   return s;
 }
 

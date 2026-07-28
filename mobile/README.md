@@ -61,7 +61,24 @@ After any `server.url`/plugin change: `npx cap sync`.
 2. Store listing, screenshots, **Data safety** form, content rating, privacy policy URL.
 3. Internal testing track → closed → production.
 
+## Biometric app lock
+The shell registers **`capacitor-native-biometric`**; the lock UI lives in the *web* app
+(`apps/web/src/components/AppLock.tsx`). Because the shell loads the hosted site via `server.url`,
+Capacitor injects the bridge into the remote page and the web app reaches plugins through
+`window.Capacitor.Plugins` — so **no plugin package is needed in `apps/web`**, only here.
+
+Behaviour: locks on cold start and after 60 s in the background; unlock with Face ID / fingerprint,
+falling back to the device passcode. **If no biometric is enrolled, the user is let straight in** —
+the Supabase session (AAL2) plus RLS are the real lock, and no one should be shut out of their own
+farm by a broken sensor. Renders nothing in a browser.
+
+```bash
+cd mobile && npm install && npx cap sync   # after adding the plugin
+```
+iOS also needs `NSFaceIDUsageDescription` in `Info.plist` ("Unlock Vayumukhi Dairy").
+
 ## Notes
 - This loads the live site, so app updates ship by deploying the web app — no store re-review for web
-  changes (only native shell changes need a new build).
+  changes (only native shell changes need a new build). This is the same JS-vs-native split Expo's OTA
+  gives you, without a second client to maintain.
 - Keep `allowNavigation` in `capacitor.config.ts` scoped to your domain + `*.supabase.co`.

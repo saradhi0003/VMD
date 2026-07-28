@@ -1,12 +1,12 @@
 import { requireOwner } from "@/lib/auth";
 import { createSupabaseServer } from "@/lib/supabase-server";
 import { Button, Card, CardHeader, EmptyState, Field, Input, Select } from "@/components/ui";
-import { addWorker, inviteUser, setUserRole, setUserStatus } from "./actions";
+import { addWorker, decideAccessRequest, inviteUser, setUserRole, setUserStatus } from "./actions";
 
-const roleLabel: Record<string, string> = { owner: "Owner", worker: "Worker", read_only: "Read-only" };
 const statusTone: Record<string, string> = {
   active: "bg-ok/10 text-ok",
   invited: "bg-surface-alt text-navy",
+  pending: "bg-warn/10 text-warn",
   disabled: "bg-warn/10 text-warn",
 };
 
@@ -20,7 +20,12 @@ export default async function TeamPage() {
     .select("id,name,role,status,email,created_at")
     .eq("farm_id", farmId)
     .order("created_at", { ascending: true });
-  const members = data ?? [];
+  const all = data ?? [];
+
+  // Pending accounts are separated out: they can't read a single row until you
+  // act, so they need to be the first thing on the page — not buried in a list.
+  const pending = all.filter((m) => m.status === "pending");
+  const members = all.filter((m) => m.status !== "pending");
 
   return (
     <div className="space-y-6">
@@ -29,6 +34,44 @@ export default async function TeamPage() {
         <h1 className="mt-2 font-serif text-3xl text-ink">Who can use the farm</h1>
         <p className="mt-1 text-ink-2">Invite staff, add workers, and manage roles. Everyone signs in with MFA.</p>
       </div>
+
+      {pending.length > 0 && (
+        <Card className="overflow-hidden border-warn/40 p-0">
+          <div className="border-b border-line bg-warn/5 px-6 py-4">
+            <h2 className="font-serif text-xl text-ink">
+              Access requests <span className="text-warn">({pending.length})</span>
+            </h2>
+            <p className="mt-1 text-sm text-ink-2">
+              These accounts are signed in but can&apos;t see any farm data until you approve them.
+            </p>
+          </div>
+          <ul className="divide-y divide-line">
+            {pending.map((p) => (
+              <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
+                <div className="min-w-0">
+                  <span className="font-medium text-ink">{p.name}</span>
+                  <div className="font-mono text-xs text-ink-3">{p.email ?? "—"}</div>
+                  <div className="mt-0.5 text-xs text-ink-3">
+                    Requested {new Date(p.created_at).toLocaleDateString()}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <form action={decideAccessRequest}>
+                    <input type="hidden" name="userId" value={p.id} />
+                    <input type="hidden" name="decision" value="approve" />
+                    <Button type="submit" className="!px-4 !py-1.5 text-xs">Approve</Button>
+                  </form>
+                  <form action={decideAccessRequest}>
+                    <input type="hidden" name="userId" value={p.id} />
+                    <input type="hidden" name="decision" value="decline" />
+                    <Button type="submit" variant="danger" className="!px-4 !py-1.5 text-xs">Decline</Button>
+                  </form>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <Card className="overflow-hidden p-0">
         <div className="border-b border-line px-6 py-4">

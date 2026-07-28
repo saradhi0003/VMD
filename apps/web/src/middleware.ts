@@ -41,9 +41,11 @@ export async function middleware(request: NextRequest) {
       profile = withStatus.data as { role?: string; status?: string };
     }
 
-    // disabled accounts can't enter
-    if (profile?.status === "disabled") {
-      return NextResponse.redirect(new URL(`${loginPath}?error=account_disabled`, request.url));
+    // Approval gate (migration 0005). RLS already returns zero rows for these
+    // accounts; this just routes them to a screen that says why.
+    // `status === undefined` means a pre-migration DB — treat as approved.
+    if (profile?.status === "pending" || profile?.status === "disabled") {
+      return NextResponse.redirect(new URL("/pending", request.url));
     }
 
     // owner area is owner-only

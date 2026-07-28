@@ -11,6 +11,14 @@ export const events = {
   "customer/quiet-detected": {
     data: z.object({ farmId: z.string().uuid(), customerId: z.string().uuid(), days: z.number() }),
   },
+  "user/access.requested": {
+    data: z.object({
+      farmId: z.string().uuid(),
+      userId: z.string().uuid(),
+      name: z.string(),
+      email: z.string(),
+    }),
+  },
   "whatsapp/send.requested": {
     data: z.object({
       farmId: z.string().uuid(),

@@ -34,9 +34,12 @@ export interface Database {
         { id: string; name: string; timezone: string; owner_whatsapp: string | null; created_at: string },
         { id?: string; name: string; timezone?: string; owner_whatsapp?: string | null }
       >;
+      // `status`: 'pending' | 'invited' | 'active' | 'disabled'. `is_approved()`
+      // (migration 0005) means status = 'active'; approved_at / notified_at track
+      // the approval gate. See skills/mfa-totp/references/approval-gate.md.
       profiles: Table<
-        { id: string; farm_id: string; name: string; role: Role; status: string; email: string | null; image: string | null; created_at: string },
-        { id: string; farm_id: string; name: string; role?: Role; status?: string; email?: string | null; image?: string | null }
+        { id: string; farm_id: string; name: string; role: Role; status: string; email: string | null; image: string | null; created_at: string; approved_at: string | null; notified_at: string | null },
+        { id: string; farm_id: string; name: string; role?: Role; status?: string; email?: string | null; image?: string | null; approved_at?: string | null; notified_at?: string | null }
       >;
       animals: Table<
         { id: string; farm_id: string; tag: string; name: string; type: AnimalType; status: AnimalStatus; health: HealthStatus; dob: string | null; photo_url: string | null; notes: string | null; created_at: string },

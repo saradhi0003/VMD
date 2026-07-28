@@ -87,6 +87,59 @@ export async function setUserRole(formData: FormData) {
   revalidatePath("/owner/team");
 }
 
+/**
+ * Approve or decline a pending access request.
+ *
+ * This is the owner-facing half of the approval gate. The real lock is
+ * `is_approved()` inside every RLS policy (migration 0005) — flipping status to
+ * 'active' is what makes that predicate start returning true for this account.
+ */
+const ApprovalInput = z.object({
+  userId: z.string().uuid(),
+  decision: z.enum(["approve", "decline"]),
+});
+
+export async function decideAccessRequest(formData: FormData) {
+  const session = await requireOwner();
+  const { userId, decision } = ApprovalInput.parse({
+    userId: formData.get("userId"),
+    decision: formData.get("decision"),
+  });
+
+  const svc = createServiceClient();
+
+  // Service role bypasses RLS, so scope the write to this owner's farm by hand —
+  // otherwise an owner could approve a stranger on someone else's farm.
+  const { data: target } = await svc
+    .from("profiles")
+    .select("id,farm_id,status")
+    .eq("id", userId)
+    .eq("farm_id", session.profile.farm_id)
+    .maybeSingle();
+  if (!target) throw new Error("No such pending member on this farm.");
+
+  const status = decision === "approve" ? "active" : "disabled";
+  const { error } = await svc
+    .from("profiles")
+    .update({
+      status,
+      approved_at: decision === "approve" ? new Date().toISOString() : null,
+    })
+    .eq("id", userId)
+    .eq("farm_id", session.profile.farm_id);
+  if (error) throw new Error(error.message);
+
+  await recordAudit({
+    farmId: session.profile.farm_id,
+    userId: session.userId,
+    action: decision === "approve" ? "approve_access" : "decline_access",
+    entity: "user",
+    entityId: userId,
+    diff: { status },
+  });
+  revalidatePath("/owner/team");
+}
+
 const StatusInput = z.object({ userId: z.string().uuid(), status: z.enum(["active", "disabled"]) });
 export async function setUserStatus(formData: FormData) {
   const session = await requireOwner();
