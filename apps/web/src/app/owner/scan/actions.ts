@@ -5,45 +5,30 @@ import { z } from "zod";
 import { requireOwner } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
 import { createSupabaseServer } from "@/lib/supabase-server";
-import { bulkInsertFeed, bulkInsertMilk, uploadAndScan } from "@/lib/scan";
+import { confirmFeedFromScan, confirmMilkFromScan, runScanUpload } from "@/lib/scan";
+
+/**
+ * Owner half of the Smart Scan flow. The pipeline itself lives in `lib/scan.ts`
+ * and is shared with `/worker/scan`; only the guard and the redirects differ.
+ * `confirmExpense` is owner-only — workers can't book expenses.
+ */
 
 export async function processScan(formData: FormData) {
   const session = await requireOwner();
-  const file = formData.get("image");
-  if (!(file instanceof File) || file.size === 0) {
-    redirect("/owner/scan?error=no_image");
-  }
-  const { scanId } = await uploadAndScan(file, session.profile.farm_id, session.userId);
-  if (!scanId) redirect("/owner/scan?error=scan_failed");
-  redirect(`/owner/scan/review?scanId=${scanId}`);
+  const out = await runScanUpload(session, formData);
+  if (!out.ok) redirect(`/owner/scan?error=${out.code}`);
+  redirect(`/owner/scan/review?scanId=${out.scanId}`);
 }
 
-const MilkRows = z.array(
-  z.object({
-    animal: z.string().nullable(),
-    litres: z.number().nullable(),
-    fatPct: z.number().nullable(),
-    shift: z.enum(["morning", "evening"]).nullable(),
-  }),
-);
 export async function confirmMilkRows(formData: FormData) {
   const session = await requireOwner();
-  const scanId = z.string().uuid().parse(formData.get("scanId"));
-  const rows = MilkRows.parse(JSON.parse(String(formData.get("rows") ?? "[]")));
-  const n = await bulkInsertMilk(session.profile.farm_id, session.userId, rows);
-  await recordAudit({ farmId: session.profile.farm_id, userId: session.userId, action: "scan_confirm", entity: "milk_session", entityId: scanId, diff: { count: n } });
+  await confirmMilkFromScan(session, formData);
   redirect("/owner/production");
 }
 
-const FeedRows = z.array(
-  z.object({ feedType: z.string().nullable(), quantity: z.string().nullable(), animal: z.string().nullable() }),
-);
 export async function confirmFeedRows(formData: FormData) {
   const session = await requireOwner();
-  const scanId = z.string().uuid().parse(formData.get("scanId"));
-  const rows = FeedRows.parse(JSON.parse(String(formData.get("rows") ?? "[]")));
-  const n = await bulkInsertFeed(session.profile.farm_id, session.userId, rows);
-  await recordAudit({ farmId: session.profile.farm_id, userId: session.userId, action: "scan_confirm", entity: "activity_log:feed", entityId: scanId, diff: { count: n } });
+  await confirmFeedFromScan(session, formData);
   redirect("/owner/workspace");
 }
 
@@ -53,6 +38,7 @@ const ExpenseInput = z.object({
   description: z.string().max(2000).optional(),
   amount: z.coerce.number().positive(),
 });
+
 export async function confirmExpense(formData: FormData) {
   const session = await requireOwner();
   const parsed = ExpenseInput.parse({

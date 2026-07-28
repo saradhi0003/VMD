@@ -1,9 +1,17 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 const config: NextConfig = {
   reactStrictMode: true,
+  // Pin the monorepo root. Without this Next guesses it from lockfile location
+  // and warns on every build; the guess also decides which files get traced
+  // into the serverless bundle, so an incorrect one can drop workspace deps.
+  outputFileTracingRoot: path.join(__dirname, "../../"),
   experimental: {
-    serverActions: { bodySizeLimit: "5mb" },
+    // Must stay ABOVE MAX_UPLOAD_BYTES in src/lib/upload.ts (10 MB) so an
+    // oversized photo hits our validator and gets a readable message, rather
+    // than being rejected here as an opaque 413.
+    serverActions: { bodySizeLimit: "12mb" },
   },
   transpilePackages: ["@vmd/supabase", "@vmd/llm", "@vmd/jobs"],
   // Workspace packages use NodeNext ESM imports (e.g. "./browser.js") that point

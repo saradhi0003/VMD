@@ -22,6 +22,10 @@ test-results/
 apps/web/tests/.auth/
 .supabase/
 
+# Supabase CLI local state (machine-specific — not schema)
+supabase/.branches/
+supabase/.temp/
+
 # Capacitor (mobile/) — generated native build artifacts & deps
 mobile/node_modules/
 mobile/ios/App/Pods/

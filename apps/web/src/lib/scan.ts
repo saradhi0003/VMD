@@ -1,5 +1,9 @@
 import { scanDocument, type ScanFeedRow, type ScanMilkRow, type ScanResult } from "@vmd/llm";
+import { z } from "zod";
 import { createSupabaseServer } from "./supabase-server";
+import { recordAudit } from "./audit";
+import { UploadError, validateUpload } from "./upload";
+import type { SessionContext } from "./auth";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const defaultShift = (): "morning" | "evening" => (new Date().getHours() < 12 ? "morning" : "evening");
@@ -89,6 +93,97 @@ export async function bulkInsertFeed(farmId: string, userId: string, rows: ScanF
   const { error } = await supabase.from("activity_logs").insert(inserts);
   if (error) throw new Error(error.message);
   return inserts.length;
+}
+
+/* ──────────────────────────────────────────────────────────
+   Shared scan-flow steps.
+
+   `/owner/scan` and `/worker/scan` run the identical pipeline and differ only
+   in which guard they call and where they redirect afterwards. These helpers
+   hold the common half so the two `"use server"` files stay thin.
+
+   Redirects deliberately stay in the route actions: `redirect()` works by
+   throwing, so keeping it visible at the call site avoids a helper silently
+   swallowing (or triggering) control flow the reader can't see.
+─────────────────────────────────────────────────────────── */
+
+export const ScanMilkRows = z.array(
+  z.object({
+    animal: z.string().nullable(),
+    litres: z.number().nullable(),
+    fatPct: z.number().nullable(),
+    shift: z.enum(["morning", "evening"]).nullable(),
+  }),
+);
+
+export const ScanFeedRows = z.array(
+  z.object({
+    feedType: z.string().nullable(),
+    quantity: z.string().nullable(),
+    animal: z.string().nullable(),
+  }),
+);
+
+export type ScanUploadOutcome =
+  | { ok: true; scanId: string }
+  | { ok: false; code: string };
+
+/**
+ * Validate → upload → classify. Returns an outcome instead of redirecting so
+ * each route can send the user to its own error/review URL.
+ */
+export async function runScanUpload(
+  session: SessionContext,
+  formData: FormData,
+): Promise<ScanUploadOutcome> {
+  let file: File;
+  try {
+    file = validateUpload(formData.get("image"), session.userId);
+  } catch (err) {
+    if (err instanceof UploadError) return { ok: false, code: err.code };
+    throw err;
+  }
+
+  const { scanId } = await uploadAndScan(file, session.profile.farm_id, session.userId);
+  return scanId ? { ok: true, scanId } : { ok: false, code: "scan_failed" };
+}
+
+/** Parse + insert confirmed milk rows, with the audit entry. Returns the row count. */
+export async function confirmMilkFromScan(
+  session: SessionContext,
+  formData: FormData,
+): Promise<number> {
+  const scanId = z.string().uuid().parse(formData.get("scanId"));
+  const rows = ScanMilkRows.parse(JSON.parse(String(formData.get("rows") ?? "[]")));
+  const n = await bulkInsertMilk(session.profile.farm_id, session.userId, rows);
+  await recordAudit({
+    farmId: session.profile.farm_id,
+    userId: session.userId,
+    action: "scan_confirm",
+    entity: "milk_session",
+    entityId: scanId,
+    diff: { count: n },
+  });
+  return n;
+}
+
+/** Parse + insert confirmed feed rows, with the audit entry. Returns the row count. */
+export async function confirmFeedFromScan(
+  session: SessionContext,
+  formData: FormData,
+): Promise<number> {
+  const scanId = z.string().uuid().parse(formData.get("scanId"));
+  const rows = ScanFeedRows.parse(JSON.parse(String(formData.get("rows") ?? "[]")));
+  const n = await bulkInsertFeed(session.profile.farm_id, session.userId, rows);
+  await recordAudit({
+    farmId: session.profile.farm_id,
+    userId: session.userId,
+    action: "scan_confirm",
+    entity: "activity_log:feed",
+    entityId: scanId,
+    diff: { count: n },
+  });
+  return n;
 }
 
 /** Fetch a stored scan result for the review screen. */
