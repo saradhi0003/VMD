@@ -112,7 +112,11 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: mobile/dist/*
+          # Workspace-root relative. `defaults.run.working-directory: mobile`
+          # applies to `run:` steps ONLY — an action's paths are always resolved
+          # from GITHUB_WORKSPACE. The staging step writes to ../dist, i.e.
+          # <workspace>/dist, so that is what this must point at.
+          files: dist/*
           generate_release_notes: true
           body: |
             ### 📲 Install on Android
