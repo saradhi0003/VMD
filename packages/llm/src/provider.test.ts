@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { activeProvider, chatJson } from "./provider.js";
+import { activeProvider, capabilities, chatJson, supportsVision } from "./provider.js";
 
 /**
  * Provider adapter. All offline — `fetch` is stubbed, so these are free and fast
@@ -14,6 +14,9 @@ function clearProviderEnv() {
   vi.stubEnv("LLM_MODEL_FAST", "");
   vi.stubEnv("LLM_MODEL_AGENT", "");
   vi.stubEnv("ANTHROPIC_API_KEY", "");
+  vi.stubEnv("DEEPSEEK_API_KEY", "");
+  vi.stubEnv("DEEPSEEK_BASE_URL", "");
+  vi.stubEnv("DEEPSEEK_MODEL", "");
 }
 
 describe("activeProvider", () => {
@@ -45,6 +48,118 @@ describe("activeProvider", () => {
     vi.stubEnv("LLM_PROVIDER", "openai-compat"); // but no LLM_BASE_URL
     vi.stubEnv("ANTHROPIC_API_KEY", "sk-ant-test");
     expect(activeProvider()).toBe("none");
+  });
+
+  it("selects deepseek when forced and keyed", () => {
+    vi.stubEnv("LLM_PROVIDER", "deepseek");
+    vi.stubEnv("DEEPSEEK_API_KEY", "sk-ds");
+    expect(activeProvider()).toBe("deepseek");
+  });
+
+  it("forced deepseek accepts the generic LLM_API_KEY", () => {
+    vi.stubEnv("LLM_PROVIDER", "deepseek");
+    vi.stubEnv("LLM_API_KEY", "sk-generic");
+    expect(activeProvider()).toBe("deepseek");
+  });
+
+  it("auto-detect does NOT treat LLM_API_KEY as a DeepSeek key", () => {
+    // LLM_API_KEY belongs to the self-hosted path; letting it imply DeepSeek
+    // would silently route a local setup to a paid API.
+    vi.stubEnv("LLM_API_KEY", "sk-generic");
+    expect(activeProvider()).toBe("none");
+  });
+
+  it("auto-detect prefers DeepSeek over Anthropic (cheaper wins)", () => {
+    vi.stubEnv("DEEPSEEK_API_KEY", "sk-ds");
+    vi.stubEnv("ANTHROPIC_API_KEY", "sk-ant");
+    expect(activeProvider()).toBe("deepseek");
+  });
+
+  it("self-hosted still outranks DeepSeek (free wins)", () => {
+    vi.stubEnv("LLM_BASE_URL", "https://x.trycloudflare.com/v1");
+    vi.stubEnv("DEEPSEEK_API_KEY", "sk-ds");
+    expect(activeProvider()).toBe("openai-compat");
+  });
+});
+
+describe("capabilities", () => {
+  beforeEach(clearProviderEnv);
+
+  it("records what each backend can actually do", () => {
+    expect(capabilities("deepseek")).toEqual({ vision: false, jsonSchema: false, reasoning: true });
+    expect(capabilities("anthropic")).toEqual({ vision: true, jsonSchema: true, reasoning: false });
+    expect(capabilities("openai-compat")).toEqual({ vision: true, jsonSchema: true, reasoning: false });
+    expect(capabilities("none")).toEqual({ vision: false, jsonSchema: false, reasoning: false });
+  });
+
+  it("supportsVision() reflects the active provider", () => {
+    vi.stubEnv("LLM_PROVIDER", "deepseek");
+    vi.stubEnv("DEEPSEEK_API_KEY", "sk-ds");
+    expect(supportsVision()).toBe(false);
+
+    vi.stubEnv("LLM_PROVIDER", "anthropic");
+    vi.stubEnv("ANTHROPIC_API_KEY", "sk-ant");
+    expect(supportsVision()).toBe(true);
+  });
+});
+
+describe("chatJson (deepseek)", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  const body = () => JSON.parse(fetchMock.mock.calls[0]![1]!.body as string);
+
+  beforeEach(() => {
+    clearProviderEnv();
+    vi.stubEnv("LLM_PROVIDER", "deepseek");
+    vi.stubEnv("DEEPSEEK_API_KEY", "sk-ds");
+    fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: '{"litres":1}' } }],
+            usage: { prompt_tokens: 5, completion_tokens: 5 },
+            model: "deepseek-v4-flash",
+          }),
+          { status: 200 },
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("appends /v1 to a bare host", async () => {
+    vi.stubEnv("DEEPSEEK_BASE_URL", "https://api.deepseek.com");
+    await chatJson({ user: "hi", maxTokens: 10 });
+    expect(fetchMock.mock.calls[0]![0]).toBe("https://api.deepseek.com/v1/chat/completions");
+  });
+
+  it("does not double up /v1 when already present", async () => {
+    vi.stubEnv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1");
+    await chatJson({ user: "hi", maxTokens: 10 });
+    expect(fetchMock.mock.calls[0]![0]).toBe("https://api.deepseek.com/v1/chat/completions");
+  });
+
+  it("downgrades json_schema to json_object and inlines the schema", async () => {
+    // DeepSeek answers "This response_format type is unavailable now" for
+    // json_schema, so the shape has to travel in the prompt instead.
+    const schema = { type: "object", properties: { litres: { type: "number" } } };
+    await chatJson({ user: "read this", maxTokens: 10, jsonSchema: { name: "milk", schema } });
+    const b = body();
+    expect(b.response_format).toEqual({ type: "json_object" });
+    expect(b.messages.at(-1).content).toContain(JSON.stringify(schema));
+    expect(b.messages.at(-1).content).toContain("read this");
+  });
+
+  it("pads the token budget so reasoning cannot starve the answer", async () => {
+    // Observed: deepseek-v4-pro spent all 16 tokens reasoning and returned "".
+    await chatJson({ user: "hi", maxTokens: 512 });
+    expect(body().max_tokens).toBeGreaterThanOrEqual(2048);
+  });
+
+  it("refuses an image instead of sending one it cannot read", async () => {
+    await expect(
+      chatJson({ user: "read", maxTokens: 10, image: { base64: "QQ==", mediaType: "image/png" } }),
+    ).rejects.toThrow(/cannot read images/i);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

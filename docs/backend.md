@@ -74,10 +74,34 @@ model's answer as a **JSON string** in `.text`, so callers parse identically.
 
 | Env | Provider |
 |---|---|
-| `LLM_BASE_URL` set | `openai-compat` — self-hosted OpenAI-compatible server (free; wins over Anthropic) |
+| `LLM_BASE_URL` set | `openai-compat` — self-hosted OpenAI-compatible server (free, so it wins) |
+| `DEEPSEEK_API_KEY` set | `deepseek` — cheap hosted, OpenAI-shaped (beats Anthropic on cost) |
 | only `ANTHROPIC_API_KEY` | `anthropic` — hosted Claude (`MODEL_AGENT` sonnet-4-6, `MODEL_FAST` haiku-4-5) |
 | neither | `none` — callers use their offline fallbacks |
 | `LLM_PROVIDER` | forces a backend, or `none` if that one isn't configured |
+
+### Capabilities — not every backend can do everything
+`capabilities()` in `provider.ts` records what each backend actually supports,
+**verified against the live APIs**. Getting these wrong fails at runtime, not compile time.
+
+| | vision | json_schema | reasoning tokens |
+|---|---|---|---|
+| `openai-compat` (vLLM) | ✅ | ✅ grammar-constrained | — |
+| `anthropic` | ✅ | ✅ via forced tool | — |
+| `deepseek` | ❌ rejects `image_url` | ❌ `json_object` only | ✅ burns budget before answering |
+
+Consequences, all handled:
+- **Smart Scan needs vision.** On DeepSeek, `scanDocument`/`extractMilkFromImage` degrade to the
+  empty result and log why — they never throw (golden rule 5). Voice, assistant and the daily agent
+  are unaffected.
+- **Without `json_schema`** the schema is inlined into the prompt and `json_object` guarantees valid
+  JSON but *not our shape* — so `parseJson`/`parseScan` become load-bearing again rather than a
+  belt-and-braces net.
+- **Reasoning models** spend completion tokens thinking first; budgets are padded ×4 (min 2048) or
+  `content` comes back empty with `finish_reason: "length"`.
+- `runDailyAgent` validates findings **individually** and drops malformed ones, so one bad field
+  can't discard a whole run — a real failure seen with DeepSeek putting an animal *name* in
+  `related_entity_id`.
 
 - **Free path:** run `infra/colab/vayumukhi-llm-server.ipynb` (Qwen2.5-VL-7B-AWQ on a Colab T4) and
   paste its `LLM_*` output into `.env.local`. See [infra/colab/README.md](../infra/colab/README.md)

@@ -8,13 +8,28 @@ import { z } from "zod";
    matches what we accept.
 ─────────────────────────────────────────────────────────── */
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * An optional pointer to the row a finding is about.
+ *
+ * Providers that can't be grammar-constrained (DeepSeek offers `json_object`
+ * only) will happily put a *name* here — "Ganga" instead of a uuid. Rejecting
+ * that threw away the entire batch of findings over one advisory field, so
+ * anything that isn't a real uuid is coerced to null instead.
+ */
+const RelatedEntityId = z.preprocess(
+  (v) => (typeof v === "string" && UUID_RE.test(v) ? v : null),
+  z.string().uuid().nullable(),
+);
+
 export const FindingSchema = z.object({
   severity: z.enum(["info", "warning", "critical"]),
   title: z.string().min(4).max(200),
   detail: z.string().min(8).max(1200),
   suggested_action: z.string().min(4).max(400),
   related_entity: z.enum(["animal", "customer", "milk_session", "expense", "reminder", "none"]).default("none"),
-  related_entity_id: z.string().uuid().optional().nullable(),
+  related_entity_id: RelatedEntityId.optional(),
   confidence: z.number().min(0).max(1),
 });
 

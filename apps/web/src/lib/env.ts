@@ -31,11 +31,16 @@ const Env = z
     SUPABASE_URL: blank(z.string().url()),
 
     // Self-hosted / OpenAI-compatible LLM (Colab vLLM). Wins over Anthropic.
-    LLM_PROVIDER: blank(z.enum(["openai-compat", "anthropic"])),
+    LLM_PROVIDER: blank(z.enum(["openai-compat", "anthropic", "deepseek"])),
     LLM_BASE_URL: blank(z.string().url()),
     LLM_API_KEY: blank(z.string()),
     LLM_MODEL_AGENT: blank(z.string()),
     LLM_MODEL_FAST: blank(z.string()),
+    // DeepSeek (OpenAI-compatible transport, but no vision and no json_schema —
+    // see packages/llm/src/provider.ts CAPABILITIES).
+    DEEPSEEK_API_KEY: blank(z.string()),
+    DEEPSEEK_BASE_URL: blank(z.string().url()),
+    DEEPSEEK_MODEL: blank(z.string()),
     // Range-checked in packages/llm/src/provider.ts; a string here.
     LLM_TIMEOUT_MS: blank(z.string()),
     ANTHROPIC_API_KEY: blank(z.string()),

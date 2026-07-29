@@ -1,4 +1,4 @@
-import { activeProvider, chatJson } from "./provider.js";
+import { activeProvider, chatJson, supportsVision } from "./provider.js";
 import { MILK_EXTRACTION_SCHEMA, SCAN_RESULT_SCHEMA } from "./tools.js";
 
 /** Structured fields pulled from a milk slip photo or a spoken entry. */
@@ -52,6 +52,22 @@ function isConfigured(): boolean {
   return activeProvider() !== "none";
 }
 
+/**
+ * A provider can be configured yet unable to read photos — DeepSeek rejects
+ * image blocks entirely. Treat that exactly like "no provider": degrade to the
+ * empty result rather than throwing, so a worker pressing Scan never sees a
+ * crash (golden rule 5).
+ */
+function canSeeImages(): boolean {
+  if (!isConfigured()) return false;
+  if (supportsVision()) return true;
+  console.warn(
+    `[extract] provider "${activeProvider()}" has no vision support — Smart Scan is unavailable. ` +
+      "Configure LLM_BASE_URL (Colab/vLLM) or ANTHROPIC_API_KEY for photo scanning.",
+  );
+  return false;
+}
+
 /** Offline fallback parser (no API key): pulls litres / fat% / shift from plain text. */
 function regexParse(text: string): MilkExtraction {
   const litM = text.match(/(\d+(?:\.\d+)?)\s*(?:l\b|lit|litre|liter)/i) ?? text.match(/(\d+(?:\.\d+)?)/);
@@ -70,7 +86,7 @@ function regexParse(text: string): MilkExtraction {
 
 /** OCR + parse a milk-slip photo. Returns empty extraction if the LLM is unset. */
 export async function extractMilkFromImage(base64: string, mediaType: string): Promise<MilkExtraction> {
-  if (!isConfigured()) return { ...EMPTY };
+  if (!canSeeImages()) return { ...EMPTY };
   const res = await chatJson({
     user: INSTRUCTION,
     image: { base64, mediaType },
@@ -163,7 +179,7 @@ function parseScan(text: string): ScanResult {
 
 /** Classify + extract a photographed sheet/receipt. Returns `other` (no rows) when the LLM is unset. */
 export async function scanDocument(base64: string, mediaType: string): Promise<ScanResult> {
-  if (!isConfigured()) return { type: "other", confidence: 0, rawText: "", title: null };
+  if (!canSeeImages()) return { type: "other", confidence: 0, rawText: "", title: null };
   const res = await chatJson({
     user: SCAN_INSTRUCTION,
     image: { base64, mediaType },

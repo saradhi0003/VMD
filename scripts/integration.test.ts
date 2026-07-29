@@ -52,10 +52,21 @@ describe("LLM context layer — provider resolution", () => {
     expect(activeProvider()).toBe("openai-compat");
   });
 
+  it("prefers DeepSeek over Anthropic when both are configured", async () => {
+    const { activeProvider } = await import("../packages/llm/src/provider.js");
+    set("LLM_BASE_URL", undefined);
+    set("LLM_PROVIDER", "");
+    set("DEEPSEEK_API_KEY", "sk-ds-test");
+    set("ANTHROPIC_API_KEY", "sk-ant-test");
+    expect(activeProvider()).toBe("deepseek"); // cheaper wins
+  });
+
   it("falls back to Anthropic, then to none", async () => {
     const { activeProvider } = await import("../packages/llm/src/provider.js");
     set("LLM_BASE_URL", undefined);
     set("LLM_PROVIDER", "");
+    set("DEEPSEEK_API_KEY", undefined);
+    set("LLM_API_KEY", undefined);
     set("ANTHROPIC_API_KEY", "sk-ant-test");
     expect(activeProvider()).toBe("anthropic");
     set("ANTHROPIC_API_KEY", undefined);
@@ -64,7 +75,32 @@ describe("LLM context layer — provider resolution", () => {
 
   it("resolves a real provider from the live .env.local", async () => {
     const { activeProvider } = await import("../packages/llm/src/provider.js");
-    expect(["anthropic", "openai-compat"]).toContain(activeProvider());
+    expect(["anthropic", "openai-compat", "deepseek"]).toContain(activeProvider());
+  });
+});
+
+describe("Capabilities — verified against the live APIs", () => {
+  it("DeepSeek: no vision, no json_schema, burns reasoning tokens", async () => {
+    const { capabilities } = await import("../packages/llm/src/provider.js");
+    expect(capabilities("deepseek")).toEqual({
+      vision: false,
+      jsonSchema: false,
+      reasoning: true,
+    });
+  });
+
+  it("Smart Scan degrades (never throws) on a vision-less provider", async () => {
+    const saved = process.env.LLM_PROVIDER;
+    process.env.LLM_PROVIDER = "deepseek";
+    try {
+      const { scanDocument } = await import("../packages/llm/src/extract.js");
+      const out = await scanDocument("ZmFrZQ==", "image/jpeg");
+      expect(out.type).toBe("other");
+      expect(out.confidence).toBe(0);
+    } finally {
+      if (saved) process.env.LLM_PROVIDER = saved;
+      else delete process.env.LLM_PROVIDER;
+    }
   });
 });
 

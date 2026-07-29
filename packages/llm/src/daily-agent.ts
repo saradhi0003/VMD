@@ -1,6 +1,6 @@
 import { DAILY_AGENT_SYSTEM } from "./prompts.js";
 import { chatJson } from "./provider.js";
-import { tools, RecordFindingsSchema, type FindingInput } from "./tools.js";
+import { tools, FindingSchema, type FindingInput } from "./tools.js";
 
 /**
  * Input snapshot the orchestrator builds from the DB before invoking the agent.
@@ -61,10 +61,28 @@ Produce findings now. Use the record_findings tool.`;
     },
   });
 
-  const parsed = RecordFindingsSchema.parse(JSON.parse(response.text));
+  // Validate findings INDIVIDUALLY. A provider that can't be grammar-constrained
+  // will occasionally violate one field, and losing the whole run because one of
+  // eight findings was malformed is the wrong trade for a best-effort advisor.
+  const raw = JSON.parse(response.text) as { findings?: unknown[] };
+  const candidates = Array.isArray(raw?.findings) ? raw.findings : [];
+  const findings: FindingInput[] = [];
+  let rejected = 0;
+  for (const c of candidates) {
+    const r = FindingSchema.safeParse(c);
+    if (r.success) findings.push(r.data);
+    else rejected++;
+  }
+  if (rejected) {
+    console.warn(`[daily-agent] dropped ${rejected}/${candidates.length} malformed findings`);
+  }
+  if (findings.length === 0 && candidates.length > 0) {
+    // Everything failed — that's a prompt/model problem worth surfacing, not swallowing.
+    throw new Error(`daily-agent: all ${candidates.length} findings failed validation`);
+  }
 
   return {
-    findings: parsed.findings,
+    findings,
     inputTokens: response.inputTokens,
     outputTokens: response.outputTokens,
     model: response.model,

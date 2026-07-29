@@ -18,24 +18,85 @@ import { anthropic, MODEL_AGENT, MODEL_FAST } from "./index.js";
    single forced tool, which is what daily-agent.ts already did.
 ─────────────────────────────────────────────────────────── */
 
-export type Provider = "openai-compat" | "anthropic" | "none";
+export type Provider = "openai-compat" | "anthropic" | "deepseek" | "none";
 
 /** Default model for the Colab server — one 7B VLM covers both vision and text roles. */
 const DEFAULT_OSS_MODEL = "Qwen/Qwen2.5-VL-7B-Instruct-AWQ";
+
+const DEEPSEEK_DEFAULT_BASE = "https://api.deepseek.com/v1";
+const DEEPSEEK_DEFAULT_MODEL = "deepseek-v4-flash";
 
 /** A free T4 takes 30-90s on a full-page scan, so the ceiling is generous. */
 const DEFAULT_TIMEOUT_MS = 120_000;
 
 /**
- * Which backend to use. `LLM_PROVIDER` forces a choice; otherwise a configured
- * `LLM_BASE_URL` wins over `ANTHROPIC_API_KEY` (self-hosted is free, so prefer it).
- * `"none"` means callers fall back to their offline behaviour — never an error.
+ * What each backend can actually do. Verified against the live APIs — these are
+ * not guesses, and getting them wrong fails at runtime rather than at compile time.
+ *
+ *  • `vision`     — accepts an `image_url` content block. DeepSeek rejects the
+ *                   block outright ("unknown variant `image_url`"), so Smart Scan
+ *                   is impossible on it and must degrade rather than throw.
+ *  • `jsonSchema` — supports `response_format: {type:"json_schema"}` and so can be
+ *                   grammar-constrained. DeepSeek answers "This response_format
+ *                   type is unavailable now"; it only offers `json_object`, which
+ *                   guarantees *valid JSON* but not *our shape* — so the schema
+ *                   has to go into the prompt and `parseJson`/`parseScan` become
+ *                   load-bearing again.
+ *  • `reasoning`  — burns completion tokens on hidden reasoning before emitting
+ *                   any content. Budgets must be padded or `content` comes back
+ *                   EMPTY with finish_reason "length" (observed on deepseek-v4-pro
+ *                   at max_tokens 16).
+ */
+interface Capabilities {
+  vision: boolean;
+  jsonSchema: boolean;
+  reasoning: boolean;
+}
+
+const CAPABILITIES: Record<Exclude<Provider, "none">, Capabilities> = {
+  "openai-compat": { vision: true, jsonSchema: true, reasoning: false },
+  anthropic: { vision: true, jsonSchema: true, reasoning: false },
+  deepseek: { vision: false, jsonSchema: false, reasoning: true },
+};
+
+export function capabilities(p: Provider = activeProvider()): Capabilities {
+  return p === "none"
+    ? { vision: false, jsonSchema: false, reasoning: false }
+    : CAPABILITIES[p];
+}
+
+/** Can the active provider read a photo? Smart Scan checks this before calling. */
+export function supportsVision(): boolean {
+  return capabilities().vision;
+}
+
+/**
+ * DeepSeek's bearer token.
+ *
+ * When the provider is chosen *explicitly* the generic `LLM_API_KEY` is accepted
+ * as a convenience. Auto-detection deliberately requires `DEEPSEEK_API_KEY`:
+ * `LLM_API_KEY` belongs to the openai-compat path, and letting it imply DeepSeek
+ * would silently route a self-hosted setup to a paid API.
+ */
+function deepseekKey(explicit = false): string | undefined {
+  return explicit
+    ? process.env.DEEPSEEK_API_KEY || process.env.LLM_API_KEY
+    : process.env.DEEPSEEK_API_KEY;
+}
+
+/**
+ * Which backend to use. `LLM_PROVIDER` forces a choice; otherwise the cheapest
+ * configured option wins (self-hosted is free, DeepSeek is far cheaper than
+ * Claude). `"none"` means callers fall back to their offline behaviour — never
+ * an error.
  */
 export function activeProvider(): Provider {
   const explicit = process.env.LLM_PROVIDER;
   if (explicit === "openai-compat") return process.env.LLM_BASE_URL ? "openai-compat" : "none";
   if (explicit === "anthropic") return process.env.ANTHROPIC_API_KEY ? "anthropic" : "none";
+  if (explicit === "deepseek") return deepseekKey(true) ? "deepseek" : "none";
   if (process.env.LLM_BASE_URL) return "openai-compat";
+  if (deepseekKey()) return "deepseek";
   if (process.env.ANTHROPIC_API_KEY) return "anthropic";
   return "none";
 }
@@ -64,7 +125,47 @@ function modelFor(provider: Provider, fast: boolean): string {
     const configured = fast ? process.env.LLM_MODEL_FAST : process.env.LLM_MODEL_AGENT;
     return configured || DEFAULT_OSS_MODEL;
   }
+  if (provider === "deepseek") {
+    const configured =
+      (fast ? process.env.LLM_MODEL_FAST : process.env.LLM_MODEL_AGENT) ||
+      process.env.DEEPSEEK_MODEL;
+    return configured || DEEPSEEK_DEFAULT_MODEL;
+  }
   return fast ? MODEL_FAST : MODEL_AGENT;
+}
+
+/** Base URL + bearer token for an OpenAI-shaped backend. */
+function endpointFor(provider: Provider): { base: string; key: string } {
+  if (provider === "deepseek") {
+    let base = process.env.LLM_BASE_URL || process.env.DEEPSEEK_BASE_URL || DEEPSEEK_DEFAULT_BASE;
+    base = base.replace(/\/+$/, "");
+    // DEEPSEEK_BASE_URL is commonly set to the bare host; the REST path is /v1.
+    if (!/\/v\d+$/.test(base)) base += "/v1";
+    return { base, key: deepseekKey(true) ?? "" };
+  }
+  return {
+    base: (process.env.LLM_BASE_URL ?? "").replace(/\/+$/, ""),
+    key: process.env.LLM_API_KEY ?? "sk-no-key",
+  };
+}
+
+/**
+ * Reasoning models spend completion tokens thinking before they emit anything,
+ * and that spend counts against `max_tokens`. Without headroom the answer is
+ * truncated to "" and every caller silently sees an empty extraction.
+ */
+function budget(provider: Provider, maxTokens: number): number {
+  return capabilities(provider).reasoning ? Math.max(maxTokens * 4, 2048) : maxTokens;
+}
+
+/**
+ * When a backend can't be grammar-constrained, the schema has to travel in the
+ * prompt instead. `json_object` still guarantees syntactically valid JSON, so
+ * only the *shape* is on trust — which is exactly what parseJson/parseScan
+ * already defend against.
+ */
+function inlineSchema(user: string, schema: Record<string, unknown>): string {
+  return `${user}\n\nRespond with ONLY a JSON object conforming to this JSON Schema. No prose, no markdown fences.\n${JSON.stringify(schema)}`;
 }
 
 function timeoutMs(): number {
@@ -79,7 +180,10 @@ function timeoutMs(): number {
 export async function chatJson(req: ChatRequest): Promise<ChatResponse> {
   const provider = activeProvider();
   if (provider === "none") throw new Error("chatJson: no LLM provider configured");
-  return provider === "openai-compat" ? callOpenAICompat(req) : callAnthropic(req);
+  if (req.image && !capabilities(provider).vision) {
+    throw new Error(`chatJson: provider "${provider}" cannot read images`);
+  }
+  return provider === "anthropic" ? callAnthropic(req) : callOpenAICompat(req, provider);
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -92,9 +196,13 @@ interface OpenAICompletion {
   model?: string;
 }
 
-async function callOpenAICompat(req: ChatRequest): Promise<ChatResponse> {
-  const base = (process.env.LLM_BASE_URL ?? "").replace(/\/+$/, "");
-  const model = modelFor("openai-compat", Boolean(req.fast));
+async function callOpenAICompat(req: ChatRequest, provider: Provider): Promise<ChatResponse> {
+  const { base, key } = endpointFor(provider);
+  const model = modelFor(provider, Boolean(req.fast));
+  const caps = capabilities(provider);
+
+  const userText =
+    req.jsonSchema && !caps.jsonSchema ? inlineSchema(req.user, req.jsonSchema.schema) : req.user;
 
   // Image first, text second — same block order the Anthropic calls used.
   const content = req.image
@@ -103,37 +211,38 @@ async function callOpenAICompat(req: ChatRequest): Promise<ChatResponse> {
           type: "image_url",
           image_url: { url: `data:${req.image.mediaType};base64,${req.image.base64}` },
         },
-        { type: "text", text: req.user },
+        { type: "text", text: userText },
       ]
-    : req.user;
+    : userText;
 
   const body = {
     model,
-    max_tokens: req.maxTokens,
+    max_tokens: budget(provider, req.maxTokens),
     temperature: 0, // extraction, not prose — keep it deterministic
     messages: [
       ...(req.system ? [{ role: "system", content: req.system }] : []),
       { role: "user", content },
     ],
-    // vLLM constrains decoding to this grammar, so the output is always schema-valid.
+    // With json_schema the backend grammar-constrains decoding, so output is
+    // always schema-valid. Backends that lack it (DeepSeek) get json_object —
+    // valid JSON, unenforced shape — with the schema inlined above.
     // `strict` is intentionally omitted: OpenAI's strict subset forbids optional
     // properties, which SCAN_RESULT_SCHEMA relies on.
     ...(req.jsonSchema
-      ? {
-          response_format: {
-            type: "json_schema",
-            json_schema: { name: req.jsonSchema.name, schema: req.jsonSchema.schema },
-          },
-        }
+      ? caps.jsonSchema
+        ? {
+            response_format: {
+              type: "json_schema",
+              json_schema: { name: req.jsonSchema.name, schema: req.jsonSchema.schema },
+            },
+          }
+        : { response_format: { type: "json_object" } }
       : {}),
   };
 
   const res = await fetch(`${base}/chat/completions`, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${process.env.LLM_API_KEY ?? "sk-no-key"}`,
-    },
+    headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeoutMs()),
   });

@@ -58,6 +58,8 @@ pnpm build        # prod build — do NOT run while `pnpm dev` is live (corrupts
 - **Approval gate**: new self-signups land `status='pending'` and read nothing until an owner approves
   them at `/owner/team`. Migration 0005 backfilled all pre-existing users to `active`.
 - **SMTP is best-effort** — unset means notifications skip silently; approval never depends on email.
-- **LLM provider**: `LLM_BASE_URL` (self-hosted, free) beats `ANTHROPIC_API_KEY`; neither → regex fallback.
+- **LLM provider**: auto order `LLM_BASE_URL` (self-hosted, free) → `DEEPSEEK_API_KEY` → `ANTHROPIC_API_KEY`;
+  none → regex fallback. **DeepSeek is text-only** — Smart Scan degrades to empty on it (no vision,
+  no `json_schema`). Capabilities live in `provider.ts`; check `supportsVision()` before sending images.
   The Colab tunnel URL **rotates every session** — re-paste it into `.env.local` and restart `pnpm dev`.
 - **Local test DB** (macOS 12): `export DOCKER_API_VERSION=1.49` before `pnpm db:test:*` (engine is API 1.49, CLI wants 1.51); the storage container health-check can false-negative — see [TESTING.md](TESTING.md).
