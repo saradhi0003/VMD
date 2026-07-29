@@ -78,9 +78,19 @@ export function useIdleLogout(enabled: boolean, onTimeout: () => void) {
       if (fired.current) return; // interval + visibility can race
       fired.current = true;
       clearStamp();
-      const supabase = createBrowserClient();
-      void supabase?.auth.signOut();
-      cb.current();
+      // Signing out is best-effort: if the Supabase client can't be built (a
+      // WebView with storage restrictions, a missing env var), still send the
+      // user to the login screen rather than throwing out of the timer.
+      try {
+        void createBrowserClient()?.auth.signOut();
+      } catch (err) {
+        console.warn("[idle-logout] signOut failed:", err);
+      }
+      try {
+        cb.current();
+      } catch (err) {
+        console.warn("[idle-logout] redirect failed:", err);
+      }
     };
 
     // A restored session inherits the stored clock: if the tab was closed or

@@ -4,6 +4,7 @@ import { createSupabaseServer } from "@/lib/supabase-server";
 import { BrandLogo } from "@/components/ui";
 import { IdleLogout } from "@/components/IdleLogout";
 import { AppLock } from "@/components/AppLock";
+import { SafeBoundary } from "@/components/SafeBoundary";
 import { OwnerNav } from "./OwnerNav";
 import { OwnerSidebar } from "./OwnerSidebar";
 
@@ -87,9 +88,9 @@ export default async function OwnerLayout({ children }: { children: React.ReactN
         </main>
       </div>
       {/* Signs out after 20 min idle — Supabase would refresh the JWT forever. */}
-      <IdleLogout loginPath="/owner/login" />
+      <SafeBoundary label="idle"><IdleLogout loginPath="/owner/login" /></SafeBoundary>
       {/* Native shell only: biometric re-lock. No-op in the browser. */}
-      <AppLock />
+      <SafeBoundary label="applock"><AppLock /></SafeBoundary>
     </div>
   );
 }

@@ -34,7 +34,12 @@ export function AppLock() {
     unlocking.current = true;
     setFailed(false);
 
-    const bio = biometricPlugin();
+    let bio: ReturnType<typeof biometricPlugin> = null;
+    try {
+      bio = biometricPlugin();
+    } catch {
+      bio = null;
+    }
     // No plugin, or no enrolled biometric → open the door. See the rule above.
     if (!bio) {
       setLocked(false);
@@ -64,32 +69,65 @@ export function AppLock() {
   }, []);
 
   useEffect(() => {
-    if (!isNativeApp()) return;
+    let native = false;
+    try {
+      native = isNativeApp();
+    } catch {
+      return; // no bridge, or a bridge that throws on probe — behave like the web
+    }
+    if (!native) return;
+
     setNative(true);
     setLocked(true);
     void unlock(); // cold start prompts immediately
 
     let remove: (() => void) | undefined;
-    void appPlugin()
-      ?.addListener("appStateChange", ({ isActive }) => {
-        if (!isActive) {
-          backgroundedAt.current = Date.now();
-          return;
-        }
-        // Only re-lock if it was away long enough to be a real context switch —
-        // a notification shade pull shouldn't demand a fingerprint.
-        const away = backgroundedAt.current ? Date.now() - backgroundedAt.current : 0;
-        backgroundedAt.current = null;
-        if (away >= LOCK_AFTER_BACKGROUND_MS) {
-          setLocked(true);
-          void unlock();
-        }
-      })
-      .then((h) => {
-        remove = h.remove;
-      });
 
-    return () => remove?.();
+    const onStateChange = ({ isActive }: { isActive: boolean }) => {
+      if (!isActive) {
+        backgroundedAt.current = Date.now();
+        return;
+      }
+      // Only re-lock if it was away long enough to be a real context switch —
+      // a notification shade pull shouldn't demand a fingerprint.
+      const away = backgroundedAt.current ? Date.now() - backgroundedAt.current : 0;
+      backgroundedAt.current = null;
+      if (away >= LOCK_AFTER_BACKGROUND_MS) {
+        setLocked(true);
+        void unlock();
+      }
+    };
+
+    try {
+      // The injected bridge is not the npm package: depending on Capacitor
+      // version and whether the plugin is registered natively, addListener may
+      // hand back a Promise OR the handle itself. Blindly calling .then() on the
+      // latter throws inside the effect and takes the whole route down.
+      const handle = appPlugin()?.addListener("appStateChange", onStateChange) as
+        | { then?: unknown; remove?: () => void }
+        | undefined;
+
+      if (handle && typeof handle.then === "function") {
+        void (handle as Promise<{ remove: () => void }>)
+          .then((h) => {
+            remove = h?.remove;
+          })
+          .catch(() => {});
+      } else if (handle && typeof handle.remove === "function") {
+        remove = handle.remove.bind(handle);
+      }
+    } catch (err) {
+      // Background re-lock is a nicety; losing it must not lose the screen.
+      console.warn("[AppLock] appStateChange listener unavailable:", err);
+    }
+
+    return () => {
+      try {
+        remove?.();
+      } catch {
+        /* ignore */
+      }
+    };
   }, [unlock]);
 
   if (!native || !locked) return null;

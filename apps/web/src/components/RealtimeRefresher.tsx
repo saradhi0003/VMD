@@ -17,29 +17,45 @@ export function RealtimeRefresher({ tables, farmId }: { tables: string[]; farmId
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const supabase = createBrowserClient();
-    if (!supabase) return; // env unavailable → skip realtime, never crash the page
-    const channel = supabase.channel(`rt:${farmId}:${tables.join(",")}`);
+    // Live updates are a nicety. Websockets are exactly the sort of thing an
+    // Android WebView restricts differently from a browser, and a throw here
+    // would unmount the whole route — so nothing in this effect may escape.
+    let cleanup: (() => void) | undefined;
+    try {
+      const supabase = createBrowserClient();
+      if (!supabase) return; // env unavailable → skip realtime, never crash the page
+      const channel = supabase.channel(`rt:${farmId}:${tables.join(",")}`);
 
-    const scheduleRefresh = () => {
-      // Debounce bursts of changes into a single refresh.
-      if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => router.refresh(), 400);
-    };
+      const scheduleRefresh = () => {
+        // Debounce bursts of changes into a single refresh.
+        if (timer.current) clearTimeout(timer.current);
+        timer.current = setTimeout(() => router.refresh(), 400);
+      };
 
-    for (const table of tables) {
-      channel.on(
-        "postgres_changes",
-        { event: "*", schema: "public", table, filter: `farm_id=eq.${farmId}` },
-        scheduleRefresh,
-      );
+      for (const table of tables) {
+        channel.on(
+          "postgres_changes",
+          { event: "*", schema: "public", table, filter: `farm_id=eq.${farmId}` },
+          scheduleRefresh,
+        );
+      }
+
+      channel.subscribe();
+
+      cleanup = () => {
+        if (timer.current) clearTimeout(timer.current);
+        supabase.removeChannel(channel);
+      };
+    } catch (err) {
+      console.warn("[realtime] live updates unavailable:", err);
     }
 
-    channel.subscribe();
-
     return () => {
-      if (timer.current) clearTimeout(timer.current);
-      supabase.removeChannel(channel);
+      try {
+        cleanup?.();
+      } catch {
+        /* ignore */
+      }
     };
     // tables is a stable literal at each call site; join() keeps the dep simple.
     // eslint-disable-next-line react-hooks/exhaustive-deps

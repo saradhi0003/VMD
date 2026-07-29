@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BrandLogo } from "@/components/ui";
 import { IdleLogout } from "@/components/IdleLogout";
 import { AppLock } from "@/components/AppLock";
+import { SafeBoundary } from "@/components/SafeBoundary";
 import { getSession } from "@/lib/auth";
 
 export default async function WorkerLayout({ children }: { children: React.ReactNode }) {
@@ -25,9 +26,9 @@ export default async function WorkerLayout({ children }: { children: React.React
       </header>
       {children}
       {/* Shared phones in a shed shouldn't stay signed in. 20 min idle → sign out. */}
-      {session && <IdleLogout loginPath="/worker/login" />}
+      {session && <SafeBoundary label="idle"><IdleLogout loginPath="/worker/login" /></SafeBoundary>}
       {/* Native shell only: biometric re-lock. No-op in the browser. */}
-      {session && <AppLock />}
+      {session && <SafeBoundary label="applock"><AppLock /></SafeBoundary>}
     </div>
   );
 }
