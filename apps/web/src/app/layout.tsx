@@ -32,7 +32,18 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   applicationName: "Vayumukhi Dairy",
   appleWebApp: { capable: true, statusBarStyle: "default", title: "Vayumukhi" },
-  icons: { icon: "/logo.svg", shortcut: "/logo.svg", apple: "/logo.svg" },
+  // iOS does NOT render SVG for the home-screen icon — an SVG-only `apple` entry
+  // gets you a grey placeholder or a screenshot of the page instead of the brand
+  // mark. It needs a real 180×180 PNG.
+  icons: {
+    icon: [
+      { url: "/logo.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    shortcut: "/logo.svg",
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
 };
 
 export const viewport: Viewport = {
