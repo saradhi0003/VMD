@@ -1,0 +1,155 @@
+name: Build iOS app
+
+# Builds the iOS app on a GitHub-hosted **macOS runner**, which matters because
+# the project's dev Mac is a 2015 MacBook Air: Apple dropped that model in
+# Ventura, so it is stuck on macOS 12 → Xcode 14.2, and Capacitor 6 needs
+# Xcode 15+. The runner has a current Xcode, so no local Mac is involved.
+#
+#   Actions → "Build iOS app" → Run workflow
+#
+# ── Signing, honestly ────────────────────────────────────────────────────────
+# Android APKs sideload with a debug signature. iOS does not: Apple requires a
+# real signing identity to run on a device, so this workflow builds UNSIGNED by
+# default. That still proves the app compiles and produces an artifact, but it
+# will not install on an iPhone as-is. To actually get it on a phone:
+#
+#   A. Free Apple ID  → open the .xcarchive/.app in Sideloadly or AltStore and
+#      let it re-sign with your Apple ID. Works, but the install expires after
+#      7 days and must be refreshed.
+#   B. Apple Developer Program ($99/yr) → set the secrets listed at the bottom,
+#      flip `signed` to true, and the job exports a signed .ipa ready for
+#      TestFlight.
+#
+# There is no free, non-expiring way to install a self-built iOS app. That is
+# Apple's rule, not a limitation of this setup — the PWA ("Add to Home Screen"
+# in Safari) is the zero-cost alternative and needs none of this.
+
+on:
+  workflow_dispatch:
+    inputs:
+      signed:
+        description: "Export a signed .ipa (requires the signing secrets)"
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    # Pinned rather than macos-latest: a runner image bump silently changing
+    # Xcode is exactly the kind of surprise that breaks a release build.
+    runs-on: macos-14
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          pod --version
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install JS dependencies
+        run: npm ci || npm install
+
+      - name: Sync native project (runs pod install)
+        run: npx cap sync ios
+
+      - name: Build UNSIGNED archive
+        if: ${{ !inputs.signed }}
+        run: |
+          xcodebuild -workspace App/App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            archive
+        working-directory: mobile/ios
+
+      # An unsigned archive can't go through -exportArchive, so package the .app
+      # in the Payload/ layout by hand. Sideloadly and AltStore accept this and
+      # re-sign it with your Apple ID.
+      - name: Package unsigned .ipa
+        if: ${{ !inputs.signed }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/Payload"
+          cp -R "$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app" "$RUNNER_TEMP/Payload/"
+          mkdir -p dist
+          (cd "$RUNNER_TEMP" && zip -qry app.ipa Payload)
+          cp "$RUNNER_TEMP/app.ipa" "dist/vayumukhi-dairy-unsigned.ipa"
+          ls -lh dist
+
+      - name: Build + export SIGNED .ipa
+        if: ${{ inputs.signed }}
+        env:
+          CERT_P12_BASE64: ${{ secrets.IOS_CERT_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.IOS_CERT_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+        run: |
+          if [ -z "$CERT_P12_BASE64" ] || [ -z "$TEAM_ID" ]; then
+            echo "::error::Signing secrets are missing. See the notes at the bottom of this workflow."
+            exit 1
+          fi
+          # Import the certificate into a throwaway keychain.
+          KEYCHAIN="$RUNNER_TEMP/build.keychain"
+          security create-keychain -p "" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "" "$KEYCHAIN"
+          echo "$CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -k "" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain
+
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "$PROFILE_BASE64" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>ad-hoc</string>
+            <key>teamID</key><string>${TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>compileBitcode</key><false/>
+          </dict></plist>
+          PLIST
+
+          xcodebuild -workspace ios/App/App.xcworkspace -scheme App \
+            -configuration Release -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            DEVELOPMENT_TEAM="$TEAM_ID" archive
+
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export"
+
+          mkdir -p dist && cp "$RUNNER_TEMP/export"/*.ipa "dist/vayumukhi-dairy.ipa"
+          ls -lh dist
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build
+          path: mobile/dist/*
+          retention-days: 90
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Secrets needed for `signed: true` (Apple Developer Program required):
+#
+#   IOS_CERT_P12_BASE64            base64 of your Apple Distribution .p12
+#                                  ( base64 -i cert.p12 | pbcopy )
+#   IOS_CERT_PASSWORD              the .p12 export password
+#   IOS_PROVISIONING_PROFILE_BASE64  base64 of the .mobileprovision
+#   IOS_TEAM_ID                    10-character Team ID from developer.apple.com
+#
+# Bundle id is in.vayumukhi.app — register it under Certificates, Identifiers &
+# Profiles before creating the profile.
+# ─────────────────────────────────────────────────────────────────────────────

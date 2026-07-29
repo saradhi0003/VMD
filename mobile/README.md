@@ -42,10 +42,40 @@ updates every installed phone instantly — no rebuild, no store review. That's 
 same JS-vs-native split Expo's OTA gives you, without a second client to maintain.
 Only native changes need a fresh APK: plugins, permissions, icon, `server.url`.
 
-### iOS
-No equivalent free path — an `.ipa` needs an Apple Developer account ($99/yr) and
-TestFlight. Until then, iPhone users can **Add to Home Screen** from Safari; the
-app is already an installable PWA (`apps/web/public/manifest.webmanifest`).
+## 🍎 iOS
+
+### You cannot build iOS on this Mac — and that's not fixable by config
+The dev machine is a **MacBook Air (Early 2015, `MacBookAir7,2`)**. Apple dropped
+that model in Ventura, so it is stuck on **macOS 12.7.6** → **Xcode 14.2** max.
+**Capacitor 6 requires Xcode 15+**, which requires macOS 13.5+. There is no
+upgrade path on this hardware.
+
+So iOS builds run on a **GitHub-hosted macOS runner** instead
+(`.github/workflows/mobile-ios.yml`, `macos-14` with a current Xcode). No local
+Xcode is involved: **Actions → Build iOS app → Run workflow**.
+
+### Getting it onto an iPhone — the honest options
+Android sideloads with a debug signature. iOS does not: Apple requires a real
+signing identity to run on a device. The workflow builds **unsigned** by default,
+which proves it compiles and produces an artifact but will **not** install as-is.
+
+| Option | Cost | Catch |
+|---|---|---|
+| **PWA — Safari → Share → Add to Home Screen** | free | No native camera plugin; the web `<input capture>` still works. **Works today, no build needed.** |
+| Free Apple ID + [Sideloadly](https://sideloadly.io) / AltStore re-signs the `.ipa` | free | Install **expires after 7 days**, must be refreshed |
+| Apple Developer Program → TestFlight | $99/yr | The only non-expiring route; workflow exports a signed `.ipa` once the secrets are set |
+
+There is no free, non-expiring way to install a self-built iOS app. That's
+Apple's rule, not a limitation here.
+
+### Info.plist
+Camera, photo library, Face ID and microphone usage strings are already set, plus
+the `vmd://` URL scheme. iOS **rejects the app at launch** — not at first use —
+if a linked framework can request a permission with no usage string, so these
+must exist before the feature is ever exercised.
+
+Remember to add `vmd://auth/callback` to **Supabase → Auth → URL Configuration →
+Redirect URLs**.
 
 ---
 

@@ -40,3 +40,6 @@ mobile/resources/
 # Capacitor build outputs (the android/ project itself IS committed so CI can build it)
 mobile/dist/
 mobile/android/app/release/
+mobile/ios/App/Pods/
+mobile/ios/App/App/public/
+mobile/ios/App/output/
