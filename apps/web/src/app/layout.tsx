@@ -32,6 +32,11 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   applicationName: "Vayumukhi Dairy",
   appleWebApp: { capable: true, statusBarStyle: "default", title: "Vayumukhi" },
+  // Next 15 emits the standardised `mobile-web-app-capable` and drops the
+  // Apple-prefixed one. iOS 15.4+ reads `display: standalone` from the manifest
+  // instead, but older iPhones only honour this legacy tag — without it they
+  // open the "installed" app inside Safari chrome rather than full-screen.
+  other: { "apple-mobile-web-app-capable": "yes" },
   // iOS does NOT render SVG for the home-screen icon — an SVG-only `apple` entry
   // gets you a grey placeholder or a screenshot of the page instead of the brand
   // mark. It needs a real 180×180 PNG.
