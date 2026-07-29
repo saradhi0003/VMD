@@ -83,6 +83,15 @@ export function VoiceForm() {
           <span className="text-base font-semibold">{listening ? "Listening… tap to stop" : "Tap to speak"}</span>
         </button>
       )}
+      {!supported && (
+        // Safari (and therefore every iPhone, PWA or native shell alike) has no
+        // SpeechRecognition — only speech *synthesis*. Say so, otherwise a tester
+        // reads a missing mic button as a broken page.
+        <p className="rounded-tile bg-surface-alt p-3 text-sm text-ink-2">
+          <span aria-hidden>⌨️</span> Speech-to-text isn&apos;t supported by this browser
+          (including all iPhones) — type the entry instead. It still gets parsed the same way.
+        </p>
+      )}
       <Field
         label={supported ? "Transcript" : "Type your entry"}
         hint='e.g. "Ganga gave 12 litres this morning, fat 4.2"'
