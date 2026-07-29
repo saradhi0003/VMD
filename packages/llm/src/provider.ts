@@ -65,9 +65,13 @@ export function capabilities(p: Provider = activeProvider()): Capabilities {
     : CAPABILITIES[p];
 }
 
-/** Can the active provider read a photo? Smart Scan checks this before calling. */
+/**
+ * Is ANY configured backend able to read a photo? Smart Scan checks this before
+ * calling. Deliberately not "can the *first* one" — if DeepSeek leads but
+ * Anthropic is also configured, scanning still works via fall-through.
+ */
 export function supportsVision(): boolean {
-  return capabilities().vision;
+  return providerChain({ vision: true }).length > 0;
 }
 
 /**
@@ -84,21 +88,52 @@ function deepseekKey(explicit = false): string | undefined {
     : process.env.DEEPSEEK_API_KEY;
 }
 
+/** Preference order: **free → cheap → expensive**. */
+const PREFERENCE = ["openai-compat", "deepseek", "anthropic"] as const;
+
+function isConfigured(p: Exclude<Provider, "none">, explicit = false): boolean {
+  switch (p) {
+    case "openai-compat":
+      return Boolean(process.env.LLM_BASE_URL);
+    case "deepseek":
+      return Boolean(deepseekKey(explicit));
+    case "anthropic":
+      return Boolean(process.env.ANTHROPIC_API_KEY);
+  }
+}
+
 /**
- * Which backend to use. `LLM_PROVIDER` forces a choice; otherwise the cheapest
- * configured option wins (self-hosted is free, DeepSeek is far cheaper than
- * Claude). `"none"` means callers fall back to their offline behaviour — never
- * an error.
+ * Every usable backend, best-first.
+ *
+ * Returning a *chain* rather than a single winner is what makes the ordering
+ * meaningful. The free tier is also the least reliable — a Colab tunnel dies on
+ * idle and its URL rotates every session — so without fall-through, "prefer
+ * free" would mean "break whenever Colab naps".
+ *
+ * `LLM_PROVIDER` pins one backend and disables fall-through, which is what you
+ * want when reproducing a bug against a specific model.
+ *
+ * @param need Filter to backends that can do the job — an image request skips
+ *             text-only providers entirely, so Smart Scan quietly uses whatever
+ *             vision-capable tier exists even when DeepSeek leads the chain.
+ */
+export function providerChain(need?: { vision?: boolean }): Exclude<Provider, "none">[] {
+  const pinned = PREFERENCE.find((p) => p === process.env.LLM_PROVIDER);
+  let chain = pinned
+    ? isConfigured(pinned, true)
+      ? [pinned]
+      : []
+    : PREFERENCE.filter((p) => isConfigured(p));
+  if (need?.vision) chain = chain.filter((p) => CAPABILITIES[p].vision);
+  return [...chain];
+}
+
+/**
+ * The backend that will be tried first. `"none"` means callers fall back to
+ * their offline behaviour — never an error.
  */
 export function activeProvider(): Provider {
-  const explicit = process.env.LLM_PROVIDER;
-  if (explicit === "openai-compat") return process.env.LLM_BASE_URL ? "openai-compat" : "none";
-  if (explicit === "anthropic") return process.env.ANTHROPIC_API_KEY ? "anthropic" : "none";
-  if (explicit === "deepseek") return deepseekKey(true) ? "deepseek" : "none";
-  if (process.env.LLM_BASE_URL) return "openai-compat";
-  if (deepseekKey()) return "deepseek";
-  if (process.env.ANTHROPIC_API_KEY) return "anthropic";
-  return "none";
+  return providerChain()[0] ?? "none";
 }
 
 export interface ChatRequest {
@@ -137,7 +172,10 @@ function modelFor(provider: Provider, fast: boolean): string {
 /** Base URL + bearer token for an OpenAI-shaped backend. */
 function endpointFor(provider: Provider): { base: string; key: string } {
   if (provider === "deepseek") {
-    let base = process.env.LLM_BASE_URL || process.env.DEEPSEEK_BASE_URL || DEEPSEEK_DEFAULT_BASE;
+    // Deliberately NOT LLM_BASE_URL — that belongs to the self-hosted tier. Both
+    // can be configured at once now that the chain falls through, and sharing
+    // the variable would point DeepSeek at the Colab tunnel.
+    let base = process.env.DEEPSEEK_BASE_URL || DEEPSEEK_DEFAULT_BASE;
     base = base.replace(/\/+$/, "");
     // DEEPSEEK_BASE_URL is commonly set to the bare host; the REST path is /v1.
     if (!/\/v\d+$/.test(base)) base += "/v1";
@@ -178,12 +216,34 @@ function timeoutMs(): number {
  * Throws on transport/HTTP errors — every caller wraps this in try/catch and degrades.
  */
 export async function chatJson(req: ChatRequest): Promise<ChatResponse> {
-  const provider = activeProvider();
-  if (provider === "none") throw new Error("chatJson: no LLM provider configured");
-  if (req.image && !capabilities(provider).vision) {
-    throw new Error(`chatJson: provider "${provider}" cannot read images`);
+  const chain = providerChain(req.image ? { vision: true } : undefined);
+
+  if (chain.length === 0) {
+    throw new Error(
+      req.image
+        ? "chatJson: no vision-capable provider configured (DeepSeek is text-only)"
+        : "chatJson: no LLM provider configured",
+    );
   }
-  return provider === "anthropic" ? callAnthropic(req) : callOpenAICompat(req, provider);
+
+  let lastError: unknown;
+  for (let i = 0; i < chain.length; i++) {
+    const p = chain[i]!;
+    try {
+      return p === "anthropic" ? await callAnthropic(req) : await callOpenAICompat(req, p);
+    } catch (err) {
+      lastError = err;
+      const next = chain[i + 1];
+      const why = err instanceof Error ? err.message : String(err);
+      // Any failure moves down the chain: a dead tunnel, an expired key and an
+      // empty credit balance are indistinguishable from here, and all mean the
+      // same thing — this tier can't serve the request right now.
+      console.warn(
+        `[llm] ${p} failed${next ? `, falling back to ${next}` : " (last in chain)"}: ${why.slice(0, 160)}`,
+      );
+    }
+  }
+  throw lastError;
 }
 
 // ─────────────────────────────────────────────────────────────────────────

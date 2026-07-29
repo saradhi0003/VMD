@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { activeProvider, capabilities, chatJson, supportsVision } from "./provider.js";
+import { activeProvider, capabilities, chatJson, providerChain, supportsVision } from "./provider.js";
 
 /**
  * Provider adapter. All offline — `fetch` is stubbed, so these are free and fast
@@ -82,6 +82,109 @@ describe("activeProvider", () => {
   });
 });
 
+describe("providerChain — free → cheap → expensive", () => {
+  beforeEach(clearProviderEnv);
+
+  it("orders every configured backend cheapest-first", () => {
+    vi.stubEnv("LLM_BASE_URL", "https://x.trycloudflare.com/v1");
+    vi.stubEnv("DEEPSEEK_API_KEY", "sk-ds");
+    vi.stubEnv("ANTHROPIC_API_KEY", "sk-ant");
+    expect(providerChain()).toEqual(["openai-compat", "deepseek", "anthropic"]);
+  });
+
+  it("omits backends that aren't configured", () => {
+    vi.stubEnv("DEEPSEEK_API_KEY", "sk-ds");
+    vi.stubEnv("ANTHROPIC_API_KEY", "sk-ant");
+    expect(providerChain()).toEqual(["deepseek", "anthropic"]);
+  });
+
+  it("is empty when nothing is configured", () => {
+    expect(providerChain()).toEqual([]);
+    expect(activeProvider()).toBe("none");
+  });
+
+  it("LLM_PROVIDER pins one backend and disables fall-through", () => {
+    vi.stubEnv("LLM_BASE_URL", "https://x.trycloudflare.com/v1");
+    vi.stubEnv("DEEPSEEK_API_KEY", "sk-ds");
+    vi.stubEnv("ANTHROPIC_API_KEY", "sk-ant");
+    vi.stubEnv("LLM_PROVIDER", "deepseek");
+    expect(providerChain()).toEqual(["deepseek"]);
+  });
+
+  it("drops text-only backends when the request needs vision", () => {
+    vi.stubEnv("DEEPSEEK_API_KEY", "sk-ds");
+    vi.stubEnv("ANTHROPIC_API_KEY", "sk-ant");
+    // DeepSeek leads on cost, but can't see — so a scan routes past it.
+    expect(providerChain()).toEqual(["deepseek", "anthropic"]);
+    expect(providerChain({ vision: true })).toEqual(["anthropic"]);
+  });
+
+  it("supportsVision() is true if ANY tier can see, not just the first", () => {
+    vi.stubEnv("DEEPSEEK_API_KEY", "sk-ds");
+    expect(supportsVision()).toBe(false);
+    vi.stubEnv("ANTHROPIC_API_KEY", "sk-ant");
+    expect(supportsVision()).toBe(true); // still DeepSeek-first for text
+    expect(activeProvider()).toBe("deepseek");
+  });
+});
+
+describe("chatJson failover", () => {
+  beforeEach(clearProviderEnv);
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("falls through to the next tier when the free one is down", async () => {
+    // The realistic case: a Colab tunnel that expired between sessions.
+    vi.stubEnv("LLM_BASE_URL", "https://dead.trycloudflare.com/v1");
+    vi.stubEnv("DEEPSEEK_API_KEY", "sk-ds");
+
+    const calls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        calls.push(new URL(url).hostname);
+        if (url.includes("trycloudflare")) throw new TypeError("fetch failed");
+        return new Response(
+          JSON.stringify({
+            choices: [{ message: { content: '{"ok":true}' } }],
+            usage: { prompt_tokens: 1, completion_tokens: 1 },
+            model: "deepseek-v4-flash",
+          }),
+          { status: 200 },
+        );
+      }),
+    );
+
+    const res = await chatJson({ user: "hi", maxTokens: 10 });
+    expect(res.model).toBe("deepseek-v4-flash");
+    expect(calls).toEqual(["dead.trycloudflare.com", "api.deepseek.com"]);
+  });
+
+  it("falls through on a billing failure, not just a network one", async () => {
+    vi.stubEnv("DEEPSEEK_API_KEY", "sk-ds");
+    vi.stubEnv("ANTHROPIC_API_KEY", "sk-ant");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("insufficient balance", { status: 402 })),
+    );
+    // DeepSeek 402 → chain moves on; Anthropic goes through the SDK, which the
+    // stub doesn't cover, so the call still fails — but from the LAST tier.
+    await expect(chatJson({ user: "hi", maxTokens: 10 })).rejects.toBeDefined();
+  });
+
+  it("surfaces the last error when every tier fails", async () => {
+    vi.stubEnv("DEEPSEEK_API_KEY", "sk-ds");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("boom", { status: 500 })));
+    await expect(chatJson({ user: "hi", maxTokens: 10 })).rejects.toThrow(/llm 500/);
+  });
+
+  it("explains itself when a scan has no vision-capable tier", async () => {
+    vi.stubEnv("DEEPSEEK_API_KEY", "sk-ds"); // text-only
+    await expect(
+      chatJson({ user: "read", maxTokens: 10, image: { base64: "QQ==", mediaType: "image/png" } }),
+    ).rejects.toThrow(/no vision-capable provider/i);
+  });
+});
+
 describe("capabilities", () => {
   beforeEach(clearProviderEnv);
 
@@ -158,7 +261,7 @@ describe("chatJson (deepseek)", () => {
   it("refuses an image instead of sending one it cannot read", async () => {
     await expect(
       chatJson({ user: "read", maxTokens: 10, image: { base64: "QQ==", mediaType: "image/png" } }),
-    ).rejects.toThrow(/cannot read images/i);
+    ).rejects.toThrow(/no vision-capable provider/i);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

@@ -72,13 +72,26 @@ model's answer as a **JSON string** in `.text`, so callers parse identically.
 
 `activeProvider()` picks one:
 
-| Env | Provider |
-|---|---|
-| `LLM_BASE_URL` set | `openai-compat` — self-hosted OpenAI-compatible server (free, so it wins) |
-| `DEEPSEEK_API_KEY` set | `deepseek` — cheap hosted, OpenAI-shaped (beats Anthropic on cost) |
-| only `ANTHROPIC_API_KEY` | `anthropic` — hosted Claude (`MODEL_AGENT` sonnet-4-6, `MODEL_FAST` haiku-4-5) |
-| neither | `none` — callers use their offline fallbacks |
-| `LLM_PROVIDER` | forces a backend, or `none` if that one isn't configured |
+`providerChain()` returns **every** configured backend, ordered **free → cheap → expensive**:
+
+| Order | Provider | Configured by | Cost |
+|---|---|---|---|
+| 1 | `openai-compat` | `LLM_BASE_URL` | free (self-hosted / Colab) |
+| 2 | `deepseek` | `DEEPSEEK_API_KEY` | cheap |
+| 3 | `anthropic` | `ANTHROPIC_API_KEY` | expensive |
+| — | `none` | nothing set | callers use their offline fallbacks |
+
+**It's a chain, not a winner.** `chatJson` walks it and falls through on *any* failure —
+a dead Colab tunnel, an expired key and an empty credit balance are indistinguishable from the call
+site and all mean "this tier can't serve the request". This matters because the free tier is also the
+least reliable: a Colab tunnel dies on idle and its URL rotates every session. Each fall-through logs
+`[llm] <tier> failed, falling back to <next>`.
+
+Set `LLM_PROVIDER` to pin one backend and **disable fall-through** — useful when reproducing a bug
+against a specific model, wrong for normal running.
+
+`DEEPSEEK_BASE_URL` is deliberately separate from `LLM_BASE_URL`: both tiers can be active at once,
+and sharing the variable would point DeepSeek at the Colab tunnel.
 
 ### Capabilities — not every backend can do everything
 `capabilities()` in `provider.ts` records what each backend actually supports,
@@ -91,9 +104,11 @@ model's answer as a **JSON string** in `.text`, so callers parse identically.
 | `deepseek` | ❌ rejects `image_url` | ❌ `json_object` only | ✅ burns budget before answering |
 
 Consequences, all handled:
-- **Smart Scan needs vision.** On DeepSeek, `scanDocument`/`extractMilkFromImage` degrade to the
-  empty result and log why — they never throw (golden rule 5). Voice, assistant and the daily agent
-  are unaffected.
+- **Smart Scan needs vision, and the chain is capability-aware.** An image request filters the chain
+  to vision-capable tiers *first*, so a scan skips DeepSeek and uses Colab or Anthropic automatically
+  — even though DeepSeek leads for text. Only when **no** tier can see do
+  `scanDocument`/`extractMilkFromImage` degrade to the empty result and log why; they never throw
+  (golden rule 5). Voice, assistant and the daily agent are unaffected either way.
 - **Without `json_schema`** the schema is inlined into the prompt and `json_object` guarantees valid
   JSON but *not our shape* — so `parseJson`/`parseScan` become load-bearing again rather than a
   belt-and-braces net.
