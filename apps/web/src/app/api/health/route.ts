@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { providerChain, supportsVision } from "@vmd/llm";
+import { providerChain } from "@vmd/llm";
 import { createSupabaseServer } from "@/lib/supabase-server";
 
 /**
@@ -38,11 +38,21 @@ export async function GET() {
   }
 
   // LLM — which tiers this deployment can reach, cheapest first.
+  //
+  // Reports CONFIGURATION, not liveness: proving a tier can serve traffic means
+  // spending money on every health check. So `vision_chain` says which tiers
+  // *could* read a photo, and it's deliberately not called "available" — a
+  // configured key with an empty balance still fails at call time.
   const chain = providerChain();
+  const visionChain = providerChain({ vision: true });
   checks.llm = {
     chain,
     active: chain[0] ?? "none",
-    smart_scan: supportsVision() ? "available" : "unavailable (no vision-capable provider)",
+    vision_chain: visionChain,
+    smart_scan:
+      visionChain.length > 0
+        ? `configured via ${visionChain.join(", ")} (not verified live)`
+        : "no vision-capable tier — scans degrade to an empty result",
     ...(chain.length === 0 ? { note: "offline regex fallback only" } : {}),
   };
 
