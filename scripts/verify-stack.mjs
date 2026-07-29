@@ -281,8 +281,59 @@ await check("Secret key absent from built client bundle", async () => {
       `pnpm verify:integration`, which runs under vitest's .js→.ts resolver)
    ════════════════════════════════════════════════════════════════════ */
 H("External API keys");
+// Which backend does the app actually use? Mirrors activeProvider() in
+// packages/llm/src/provider.ts. Only that one is allowed to FAIL the run — the
+// others are informational, since an unused key being stale breaks nothing.
+const ACTIVE =
+  process.env.LLM_PROVIDER ||
+  (process.env.LLM_BASE_URL ? "openai-compat"
+    : process.env.DEEPSEEK_API_KEY ? "deepseek"
+    : process.env.ANTHROPIC_API_KEY ? "anthropic"
+    : "none");
+record("PASS", "Active LLM provider", ACTIVE);
+
+await check("DEEPSEEK_API_KEY returns a real completion", async () => {
+  if (!process.env.DEEPSEEK_API_KEY) return { skip: "DEEPSEEK_API_KEY unset" };
+  let base = (process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").replace(/\/+$/, "");
+  if (!/\/v\d+$/.test(base)) base += "/v1";
+  const model = process.env.DEEPSEEK_MODEL || "deepseek-v4-flash";
+  const r = await fetch(`${base}/chat/completions`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`, "content-type": "application/json" },
+    // Padded budget: these are reasoning models and will otherwise spend the
+    // whole allowance thinking and return an empty string.
+    body: JSON.stringify({ model, max_tokens: 2048, messages: [{ role: "user", content: "Reply with the single word: ok" }] }),
+    signal: AbortSignal.timeout(90000),
+  });
+  const j = await r.json();
+  assert(r.ok, `HTTP ${r.status}: ${JSON.stringify(j).slice(0, 140)}`);
+  const txt = j.choices?.[0]?.message?.content ?? "";
+  assert(txt.length > 0, "empty content — raise max_tokens (reasoning ate the budget)");
+  return `${j.model} · in=${j.usage?.prompt_tokens} out=${j.usage?.completion_tokens} · "${txt.trim().slice(0, 20)}"`;
+});
+
+await check("Smart Scan has a vision-capable provider", async () => {
+  if (ACTIVE === "deepseek") {
+    return { warn: "DeepSeek is text-only — Smart Scan degrades to empty. Use Colab or Anthropic for photos." };
+  }
+  if (ACTIVE === "none") return { skip: "no provider configured" };
+  return `${ACTIVE} supports images`;
+});
+
 await check("ANTHROPIC_API_KEY returns a real completion", async () => {
   if (!process.env.ANTHROPIC_API_KEY) return { skip: "ANTHROPIC_API_KEY unset" };
+  if (ACTIVE !== "anthropic") {
+    // Not the active backend — a stale key here breaks nothing.
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 8, messages: [{ role: "user", content: "ok" }] }),
+      signal: AbortSignal.timeout(45000),
+    }).catch(() => null);
+    if (r?.ok) return "usable (not the active provider)";
+    const detail = r ? ((await r.json().catch(() => ({}))).error?.message ?? `HTTP ${r.status}`) : "unreachable";
+    return { warn: `unusable, but not in use: ${String(detail).slice(0, 90)}` };
+  }
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
